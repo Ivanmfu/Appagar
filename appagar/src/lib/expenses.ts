@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 
 export async function createExpense({
   groupId, payerId, totalCents, currency = 'EUR',
@@ -8,6 +8,7 @@ export async function createExpense({
   fxRate?: number; shares: { userId: string; shareCents: number }[];
   note?: string; category?: string; date?: string;
 }) {
+  const supabase = getSupabaseClient();
   const amountBaseMinor = Math.round(totalCents * fxRate);
   const { data: exp, error: e1 } = await supabase
     .from('expenses')

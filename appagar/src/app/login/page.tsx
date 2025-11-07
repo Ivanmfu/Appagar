@@ -1,12 +1,19 @@
 'use client';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 import { useState } from 'react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
+
   async function login() {
-    await supabase.auth.signInWithOtp({ email }); // magic link
-    alert('Revisa tu correo para iniciar sesión');
+    try {
+      const supabase = getSupabaseClient();
+      await supabase.auth.signInWithOtp({ email }); // magic link
+      alert('Revisa tu correo para iniciar sesión');
+    } catch (error) {
+      console.error(error);
+      alert('No se pudo iniciar sesión: faltan variables de entorno de Supabase');
+    }
   }
   return (
     <main className="p-6 max-w-sm mx-auto space-y-4">
