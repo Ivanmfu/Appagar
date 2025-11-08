@@ -10,8 +10,10 @@ export async function getGroupBalance(groupId: string) {
 
   if (error) throw error;
 
+  const rows = data ?? [];
+
   // Convertir a formato para simplifyDebts
-  const nets = data.map(row => ({
+  const nets = rows.map((row) => ({
     userId: row.user_id,
     net: row.net_minor
   }));
@@ -19,5 +21,5 @@ export async function getGroupBalance(groupId: string) {
   // Obtener transacciones simplificadas
   const transactions = simplifyDebts(nets);
 
-  return { balances: data, transactions };
+  return { balances: rows, transactions };
 }
