@@ -18,8 +18,12 @@ export default function LoginPage() {
   return (
     <main className="p-6 max-w-sm mx-auto space-y-4">
       <h1 className="text-xl font-semibold">Entrar</h1>
-      <input className="border p-2 w-full" placeholder="tu@email"
-             value={email} onChange={e=>setEmail(e.target.value)} />
+      <input
+        className="border p-2 w-full"
+        placeholder="tu@email"
+        value={email}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+      />
       <button className="bg-black text-white px-4 py-2 rounded" onClick={login}>Enviar enlace</button>
     </main>
   );

@@ -1,15 +1,17 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+
+type Supabase = ReturnType<typeof createClient>;
 
 declare global {
   // eslint-disable-next-line no-var
-  var __supabaseClient: SupabaseClient | undefined;
+  var __supabaseClient: Supabase | undefined;
 }
 
 const globalForSupabase = globalThis as typeof globalThis & {
-  __supabaseClient?: SupabaseClient;
+  __supabaseClient?: Supabase;
 };
 
-export function getSupabaseClient(): SupabaseClient {
+export function getSupabaseClient(): Supabase {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
