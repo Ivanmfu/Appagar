@@ -1,6 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-type Supabase = ReturnType<typeof createClient>;
+type Supabase = SupabaseClient<any, 'public', any>;
 
 declare global {
   // eslint-disable-next-line no-var
