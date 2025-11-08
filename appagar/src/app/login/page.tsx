@@ -1,6 +1,6 @@
 'use client';
 import { getSupabaseClient } from '@/lib/supabase';
-import { useState } from 'react';
+import { ChangeEvent, useState } from 'react';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -22,7 +22,9 @@ export default function LoginPage() {
         className="border p-2 w-full"
         placeholder="tu@email"
         value={email}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+        onChange={(event: ChangeEvent<HTMLInputElement>) => setEmail(event.target.value)}
+        type="email"
+        required
       />
       <button className="bg-black text-white px-4 py-2 rounded" onClick={login}>Enviar enlace</button>
     </main>
