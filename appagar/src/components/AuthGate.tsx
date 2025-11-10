@@ -147,6 +147,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        // Si venimos con PKCE (?code=...), hacemos el intercambio explícito por si la auto-detección no corre aún
+        const searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.has('code')) {
+          try {
+            setProcessingOAuth(true);
+            console.log('[Auth] Found ?code, exchanging for session...');
+            const { data: exData, error: exErr } = await supabase.auth.exchangeCodeForSession(window.location.href);
+            if (exErr) console.error('[Auth] exchangeCodeForSession error:', exErr);
+            else console.log('[Auth] exchange ok, has session:', Boolean(exData.session));
+            // limpiar querystring
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } finally {
+            setProcessingOAuth(false);
+          }
+        }
+
         // Pedimos la sesión actual (si detectSessionInUrl funcionó, ya estará poblada)
         const { data, error } = await supabase.auth.getSession();
         if (error) {
