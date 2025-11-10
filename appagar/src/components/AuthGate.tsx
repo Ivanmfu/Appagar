@@ -103,11 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout;
+    let safetyTimeout: NodeJS.Timeout;
     
     // Timeout de seguridad para no quedarse cargando infinitamente
-    const safetyTimeout = setTimeout(() => {
-      if (mounted && loading) {
+    safetyTimeout = setTimeout(() => {
+      if (mounted) {
         console.warn('Timeout de carga, forzando finalización');
         setLoading(false);
       }
@@ -135,8 +135,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Error en inicialización:', error);
       })
       .finally(() => {
-        if (mounted) setLoading(false);
-        clearTimeout(safetyTimeout);
+        if (mounted) {
+          clearTimeout(safetyTimeout);
+        }
       });
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
@@ -157,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(safetyTimeout);
       listener.subscription.unsubscribe();
     };
-  }, [pathname, refresh, router, supabase, loading]);
+  }, [pathname, refresh, router, supabase]); // Removido 'loading' de las dependencias
 
   const value = useMemo(
     () => ({ session, user: session?.user ?? null, profile, loading, refresh }),
