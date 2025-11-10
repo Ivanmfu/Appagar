@@ -90,9 +90,16 @@ export default function LoginPage() {
       const supabase = getSupabaseClient();
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
+        // Forzar PKCE + refresh_token
         options: {
-          redirectTo: `${window.location.origin}/Appagar`
-        }
+          redirectTo: `${window.location.origin}/Appagar`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+            // Intentar forzar PKCE desde query param (aceptado por Supabase)
+            flow_type: 'pkce'
+          },
+        },
       });
 
       if (authError) throw authError;
