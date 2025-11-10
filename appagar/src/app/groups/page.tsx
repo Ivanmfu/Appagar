@@ -78,37 +78,39 @@ function GroupsContent() {
 
         console.log('[Groups] Inserting group:', JSON.stringify(groupPayload));
         
-        // Añadir timeout para evitar bloqueo infinito
-        const insertPromise = supabase
+        // Hacer insert sin select para evitar bloqueo
+        const { error: insertError } = await supabase
           .from('groups')
-          .insert(groupPayload)
+          .insert(groupPayload);
+        
+        console.log('[Groups] Insert error:', insertError);
+
+        if (insertError) {
+          console.error('[Groups] Group insert error:', insertError);
+          console.error('[Groups] Error code:', insertError.code);
+          console.error('[Groups] Error message:', insertError.message);
+          throw new Error(insertError.message || 'Error al crear el grupo');
+        }
+
+        console.log('[Groups] Insert successful, fetching created group...');
+        
+        // Consultar el grupo recién creado
+        const { data: groups, error: fetchError } = await supabase
+          .from('groups')
           .select('id, name, created_at')
-          .single();
-        
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Insert timeout after 10s')), 10000)
-        );
-        
-        const insertResult = await Promise.race([insertPromise, timeoutPromise]) as any;
+          .eq('name', groupPayload.name)
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-        console.log('[Groups] Insert result:', insertResult);
-        console.log('[Groups] Insert data:', insertResult.data);
-        console.log('[Groups] Insert error:', insertResult.error);
+        console.log('[Groups] Fetch result:', groups, fetchError);
 
-        if (insertResult.error) {
-          console.error('[Groups] Group insert error:', insertResult.error);
-          console.error('[Groups] Error code:', insertResult.error.code);
-          console.error('[Groups] Error message:', insertResult.error.message);
-          throw new Error(insertResult.error.message || 'Error al crear el grupo');
+        if (fetchError || !groups || groups.length === 0) {
+          console.error('[Groups] Could not fetch created group');
+          throw new Error('Grupo creado pero no se pudo recuperar');
         }
 
-        if (!insertResult.data) {
-          console.error('[Groups] No data returned from insert');
-          throw new Error('No se recibió respuesta del servidor');
-        }
-
-        const group = insertResult.data as Group;
-        console.log('[Groups] Group created successfully:', group.id);
+        const group = groups[0] as Group;
+        console.log('[Groups] Group fetched successfully:', group.id);
 
         const memberPayload = {
           group_id: group.id,
