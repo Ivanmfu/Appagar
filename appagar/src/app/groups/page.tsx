@@ -60,67 +60,96 @@ function GroupsContent() {
 
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
-      console.log('[Groups] Starting group creation, user:', user?.id);
-      if (!user?.id) {
-        console.error('[Groups] No user ID found');
-        throw new Error('Debes iniciar sesión');
+      try {
+        console.log('[Groups] Starting group creation, user:', user?.id);
+        if (!user?.id) {
+          console.error('[Groups] No user ID found');
+          throw new Error('Debes iniciar sesión');
+        }
+        if (!name.trim()) {
+          console.error('[Groups] Empty group name');
+          throw new Error('Introduce un nombre de grupo');
+        }
+
+        const groupPayload = {
+          name: name.trim(),
+          base_currency: 'EUR',
+        };
+
+        console.log('[Groups] Inserting group:', JSON.stringify(groupPayload));
+        
+        const insertResult = await supabase
+          .from('groups')
+          .insert(groupPayload)
+          .select('id, name, created_at')
+          .single();
+
+        console.log('[Groups] Insert result:', insertResult);
+        console.log('[Groups] Insert data:', insertResult.data);
+        console.log('[Groups] Insert error:', insertResult.error);
+
+        if (insertResult.error) {
+          console.error('[Groups] Group insert error:', insertResult.error);
+          console.error('[Groups] Error code:', insertResult.error.code);
+          console.error('[Groups] Error message:', insertResult.error.message);
+          throw new Error(insertResult.error.message || 'Error al crear el grupo');
+        }
+
+        if (!insertResult.data) {
+          console.error('[Groups] No data returned from insert');
+          throw new Error('No se recibió respuesta del servidor');
+        }
+
+        const group = insertResult.data as Group;
+        console.log('[Groups] Group created successfully:', group.id);
+
+        const memberPayload = {
+          group_id: group.id,
+          user_id: user.id,
+          is_active: true,
+        };
+
+        console.log('[Groups] Inserting member:', JSON.stringify(memberPayload));
+        
+        const memberResult = await supabase
+          .from('group_members')
+          .insert(memberPayload);
+        
+        console.log('[Groups] Member result:', memberResult);
+        console.log('[Groups] Member error:', memberResult.error);
+
+        if (memberResult.error) {
+          console.error('[Groups] Member insert error:', memberResult.error);
+          console.error('[Groups] Member error code:', memberResult.error.code);
+          console.error('[Groups] Member error message:', memberResult.error.message);
+          throw new Error(memberResult.error.message || 'Error al añadir miembro');
+        }
+
+        console.log('[Groups] Member created successfully');
+        console.log('[Groups] Returning group:', group);
+        return group;
+      } catch (error) {
+        console.error('[Groups] Exception in mutationFn:', error);
+        console.error('[Groups] Exception type:', error instanceof Error ? 'Error' : typeof error);
+        if (error instanceof Error) {
+          console.error('[Groups] Exception message:', error.message);
+          console.error('[Groups] Exception stack:', error.stack);
+        }
+        throw error;
       }
-      if (!name.trim()) {
-        console.error('[Groups] Empty group name');
-        throw new Error('Introduce un nombre de grupo');
-      }
-
-      const groupPayload: GroupInsert = {
-        name: name.trim(),
-        // Asegurar moneda base por defecto (algunas configuraciones la requieren)
-        // @ts-ignore base_currency existe en la tabla aunque sea opcional
-        base_currency: 'EUR',
-      };
-
-      console.log('[Groups] Inserting group:', groupPayload);
-      const { data: group, error: groupError } = await supabase
-        .from('groups')
-        .insert(groupPayload)
-        .select('id, name, created_at')
-        .single();
-
-      if (groupError) {
-        console.error('[Groups] Group insert error:', groupError);
-        console.error('[Groups] Error details:', JSON.stringify(groupError, null, 2));
-        throw groupError;
-      }
-
-      console.log('[Groups] Group created:', group);
-
-      const memberPayload: MemberInsert = {
-        group_id: group.id,
-        user_id: user.id,
-        is_active: true,
-      };
-
-      console.log('[Groups] Inserting member:', memberPayload);
-      const { error: memberError } = await supabase
-        .from('group_members')
-        .insert(memberPayload);
-      
-      if (memberError) {
-        console.error('[Groups] Member insert error:', memberError);
-        console.error('[Groups] Member error details:', JSON.stringify(memberError, null, 2));
-        throw memberError;
-      }
-
-      console.log('[Groups] Member created successfully');
-      return group as Group;
     },
     onSuccess: async (group) => {
-      console.log('[Groups] Mutation success, invalidating queries');
+      console.log('[Groups] Mutation onSuccess, group:', group);
+      console.log('[Groups] Invalidating queries for user:', user?.id);
       await queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
       console.log('[Groups] Queries invalidated');
     },
     onError: (error) => {
-      console.error('[Groups] Mutation error:', error);
-      console.error('[Groups] Error type:', typeof error);
-      console.error('[Groups] Error stringified:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('[Groups] Mutation onError:', error);
+      console.error('[Groups] Error instanceof Error:', error instanceof Error);
+      if (error instanceof Error) {
+        console.error('[Groups] Error message:', error.message);
+      }
     },
   });
 
