@@ -124,84 +124,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[Auth] search:', window.location.search);
         console.log('[Auth] hash:', window.location.hash);
 
-        // Fallback manual: si venimos con tokens en el hash, establecemos sesión inmediatamente
-        const hashParams = new URLSearchParams(window.location.hash.slice(1));
-        if (hashParams.has('access_token')) {
-          try {
-            setProcessingOAuth(true);
-            const access_token = hashParams.get('access_token') ?? undefined;
-            const refresh_token = hashParams.get('refresh_token') ?? undefined;
-            if (access_token && refresh_token) {
-              console.log('[Auth] tokens from hash -> access:', access_token.length, 'refresh:', refresh_token.length);
-              const { data: setData, error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
-              if (setErr) console.error('[Auth] setSession error:', setErr);
-              else console.log('[Auth] setSession ok, has session:', Boolean(setData.session));
-              const { data: userData, error: userErr } = await supabase.auth.getUser();
-              if (userErr) console.error('[Auth] getUser after setSession error:', userErr);
-              else console.log('[Auth] getUser after setSession ->', Boolean(userData.user));
-              // limpiar hash para no perder tokens en futuras redirecciones
-              window.history.replaceState({}, document.title, window.location.pathname);
-            }
-          } finally {
-            setProcessingOAuth(false);
-          }
-        }
-
-        // Si venimos con PKCE (?code=...), hacemos el intercambio explícito por si la auto-detección no corre aún
+        // Limpiar código de la URL inmediatamente para evitar reusos
         const searchParams = new URLSearchParams(window.location.search);
-        if (searchParams.has('code')) {
-          try {
-            setProcessingOAuth(true);
-            console.log('[Auth] Found ?code, exchanging for session...');
-            console.log('[Auth] code value:', searchParams.get('code'));
-            // Construir URL completa para el intercambio (sin basePath en hash/search, solo origin + path)
-            const callbackUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-            console.log('[Auth] callbackUrl for exchange:', callbackUrl);
-            console.log('[Auth] About to call exchangeCodeForSession...');
-            const startTime = Date.now();
-            
-            // Añadir timeout de 8 segundos para evitar bloqueo infinito
-            const exchangePromise = supabase.auth.exchangeCodeForSession(callbackUrl);
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Exchange timeout after 8s')), 8000)
-            );
-            
-            const result = await Promise.race([exchangePromise, timeoutPromise]) as any;
-            const elapsed = Date.now() - startTime;
-            console.log('[Auth] exchangeCodeForSession completed in', elapsed, 'ms');
-            console.log('[Auth] result:', result);
-            const { data: exData, error: exErr } = result;
-            if (exErr) {
-              console.error('[Auth] exchangeCodeForSession error:', exErr);
-              console.error('[Auth] error code:', exErr.code);
-              console.error('[Auth] error status:', exErr.status);
-              console.error('[Auth] error details:', JSON.stringify(exErr, null, 2));
-            } else {
-              console.log('[Auth] exchange ok, has session:', Boolean(exData.session));
-              console.log('[Auth] session data:', exData.session ? 'present' : 'null');
-              console.log('[Auth] user:', exData.session?.user?.email);
-              // Actualizar estado inmediatamente tras exchange exitoso
-              if (exData.session) {
-                setSession(exData.session);
-                const ensuredProfile = await ensureProfile(exData.session.user);
-                setProfile(ensuredProfile ?? null);
-              }
-            }
-            // limpiar querystring
-            console.log('[Auth] Cleaning query string...');
-            window.history.replaceState({}, document.title, window.location.pathname);
-            console.log('[Auth] Query string cleaned');
-          } catch (err) {
-            console.error('[Auth] exception during exchange:', err);
-            console.error('[Auth] exception type:', typeof err);
-            console.error('[Auth] exception stringified:', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
-          } finally {
-            console.log('[Auth] Setting processingOAuth to false');
-            setProcessingOAuth(false);
-          }
+        const hashParams = new URLSearchParams(window.location.hash.slice(1));
+        
+        if (searchParams.has('code') || hashParams.has('access_token')) {
+          console.log('[Auth] OAuth callback detected, cleaning URL...');
+          window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        // Pedimos la sesión actual (si detectSessionInUrl funcionó, ya estará poblada)
+        // Con detectSessionInUrl: true y flowType: pkce, Supabase maneja automáticamente
+        // el intercambio PKCE en segundo plano. Solo necesitamos esperar un poco.
+        console.log('[Auth] Waiting for Supabase to process callback...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Pedimos la sesión actual
         console.log('[Auth] About to call getSession...');
         const { data, error } = await supabase.auth.getSession();
         console.log('[Auth] getSession completed');
@@ -211,8 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log('Sesión inicial presente:', Boolean(data.session));
           if (data.session) {
             console.log('[Auth] Session user:', data.session.user.email);
+            setSession(data.session);
+            const ensuredProfile = await ensureProfile(data.session.user);
+            setProfile(ensuredProfile ?? null);
           }
         }
+        
         console.log('[Auth] About to call refresh...');
         await refresh();
         console.log('[Auth] refresh completed');
