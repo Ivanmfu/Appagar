@@ -129,19 +129,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialize();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log('Auth state changed:', event);
+      console.log('Auth state changed:', event, 'Has session:', !!newSession);
       if (!mounted) return;
       
       setSession(newSession);
       const ensuredProfile = await ensureProfile(newSession?.user ?? null);
       setProfile(ensuredProfile ?? null);
       setLoading(false);
-
-      if (!newSession && pathname !== '/login') {
-        router.replace('/login');
-      } else if (newSession && pathname === '/login') {
-        router.replace('/');
-      }
     });
 
     return () => {
@@ -152,11 +146,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Efecto separado para manejar redirecciones basadas en pathname
   useEffect(() => {
+    console.log('Redirect effect - loading:', loading, 'session:', !!session, 'pathname:', pathname);
+    
     if (loading) return; // Esperar a que termine de cargar
     
     if (!session && pathname !== '/login') {
+      console.log('No session, redirecting to login');
       router.replace('/login');
     } else if (session && pathname === '/login') {
+      console.log('Has session, redirecting to home');
       router.replace('/');
     }
   }, [pathname, session, loading, router]);
@@ -182,7 +180,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    console.log('AuthGate - loading:', loading, 'user:', !!user);
     if (!loading && !user) {
+      console.log('AuthGate - Redirigiendo a login');
       router.replace('/login');
     }
   }, [loading, user, router]);
@@ -190,6 +190,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (loading) {
     return (
       <div className="p-6 text-center space-y-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
         <div className="text-gray-500">Comprobando sesión...</div>
         <div className="text-xs text-gray-400">Si esto tarda mucho, recarga la página</div>
       </div>
