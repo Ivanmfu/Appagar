@@ -74,17 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const supabase = getSupabaseClient();
 
   const refresh = useCallback(async () => {
-    setLoading(true);
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
         console.error('Error al recuperar la sesión', error);
         setSession(null);
         setProfile(null);
-        setLoading(false);
         return;
       }
 
@@ -102,46 +101,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   useEffect(() => {
+    if (initialized) return; // Solo inicializar una vez
+    
     let mounted = true;
-    let safetyTimeout: NodeJS.Timeout;
     
-    // Timeout de seguridad para no quedarse cargando infinitamente
-    safetyTimeout = setTimeout(() => {
-      if (mounted) {
-        console.warn('Timeout de carga, forzando finalización');
-        setLoading(false);
-      }
-    }, 5000); // 5 segundos máximo
-    
-    // Manejar el hash de OAuth en la URL
-    const handleOAuthCallback = async () => {
+    const initialize = async () => {
       try {
+        // Verificar si hay un hash de OAuth
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         if (hashParams.has('access_token')) {
           console.log('Procesando callback de OAuth...');
-          // Hay un token de OAuth en la URL, procesarlo
           await supabase.auth.getSession();
-          // Limpiar el hash de la URL
           window.history.replaceState({}, document.title, window.location.pathname);
         }
+        
+        await refresh();
       } catch (error) {
-        console.error('Error procesando OAuth callback:', error);
+        console.error('Error en inicialización:', error);
+      } finally {
+        if (mounted) {
+          setInitialized(true);
+        }
       }
     };
 
-    handleOAuthCallback()
-      .then(() => refresh())
-      .catch((error) => {
-        console.error('Error en inicialización:', error);
-      })
-      .finally(() => {
-        if (mounted) {
-          clearTimeout(safetyTimeout);
-        }
-      });
+    initialize();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log('Auth state changed:', event);
+      if (!mounted) return;
+      
       setSession(newSession);
       const ensuredProfile = await ensureProfile(newSession?.user ?? null);
       setProfile(ensuredProfile ?? null);
@@ -155,10 +144,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
-      clearTimeout(safetyTimeout);
       listener.subscription.unsubscribe();
     };
-  }, [pathname, refresh, router, supabase]); // Removido 'loading' de las dependencias
+  }, [initialized, pathname, refresh, router, supabase]);
 
   const value = useMemo(
     () => ({ session, user: session?.user ?? null, profile, loading, refresh }),

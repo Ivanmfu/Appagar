@@ -91,11 +91,12 @@ export default function LoginPage() {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/Appagar'
+          redirectTo: `${window.location.origin}/Appagar`
         }
       });
 
       if (authError) throw authError;
+      // El navegador será redirigido a Google, no necesitamos hacer nada más
     } catch (error: any) {
       console.error(error);
       setError(error.message || 'Error al iniciar sesión con Google');
