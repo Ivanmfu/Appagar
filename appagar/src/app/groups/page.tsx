@@ -5,7 +5,9 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useMemo, useState } from 'react';
+
+export const dynamic = 'force-dynamic';
 
 type Group = {
   id: string;
@@ -25,7 +27,7 @@ type GroupInsert = {
   created_by: string;
 };
 
-export default function GroupsPage() {
+function GroupsPageContent() {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -48,8 +50,10 @@ export default function GroupsPage() {
 
       if (error) throw error;
 
-      const rows = (data ?? []) as { group: Group | null }[];
-      return rows.map((row) => row.group).filter((group): group is Group => Boolean(group));
+      const rows = (data ?? []) as { group: Group[] | null }[];
+      return rows
+        .map((row) => (Array.isArray(row.group) ? row.group[0] : row.group))
+        .filter((group): group is Group => Boolean(group));
     },
   });
 
@@ -193,5 +197,13 @@ export default function GroupsPage() {
         </section>
       </main>
     </AuthGate>
+  );
+}
+
+export default function GroupsPage() {
+  return (
+    <Suspense fallback={<main className="p-6 text-sm text-gray-500">Cargando...</main>}>
+      <GroupsPageContent />
+    </Suspense>
   );
 }

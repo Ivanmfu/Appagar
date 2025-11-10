@@ -3,6 +3,8 @@
 import AuthGate, { useAuth } from '@/components/AuthGate';
 import Link from 'next/link';
 
+export const dynamic = 'force-dynamic';
+
 export default function HomePage() {
   const { profile, user, loading } = useAuth();
 
