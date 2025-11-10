@@ -26,21 +26,22 @@ export async function createExpense({
   const supabase = getSupabaseClient();
   const amountBaseMinor = Math.round(totalCents * fxRate);
 
-  const { data: expense, error: createExpenseError } = await supabase
+  const expenseData = {
+    group_id: groupId,
+    payer_id: payerId,
+    amount_minor: totalCents,
+    currency,
+    fx_rate: fxRate,
+    amount_base_minor: amountBaseMinor,
+    category,
+    note,
+    date,
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: expense, error: createExpenseError } = await (supabase as any)
     .from('expenses')
-    .insert([
-      {
-        group_id: groupId,
-        payer_id: payerId,
-        amount_minor: totalCents,
-        currency,
-        fx_rate: fxRate,
-        amount_base_minor: amountBaseMinor,
-        category,
-        note,
-        date,
-      },
-    ])
+    .insert(expenseData)
     .select()
     .single();
 
@@ -50,16 +51,17 @@ export async function createExpense({
     throw new Error('No se pudo crear el gasto');
   }
 
-  const rows = shares.map((share) => ({
+  const participantData = shares.map((share) => ({
     expense_id: expense.id,
     user_id: share.userId,
     share_minor: share.shareCents,
     is_included: true,
   }));
 
-  const { error: participantsError } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error: participantsError } = await (supabase as any)
     .from('expense_participants')
-    .insert(rows);
+    .insert(participantData);
 
   if (participantsError) throw participantsError;
 
