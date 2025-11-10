@@ -96,7 +96,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    refresh().finally(() => {
+    
+    // Manejar el hash de OAuth en la URL
+    const handleOAuthCallback = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      if (hashParams.has('access_token')) {
+        // Hay un token de OAuth en la URL, procesarlo
+        await supabase.auth.getSession();
+        // Limpiar el hash de la URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
+    handleOAuthCallback().then(() => refresh()).finally(() => {
       if (mounted) setLoading(false);
     });
 
