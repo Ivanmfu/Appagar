@@ -79,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = getSupabaseClient();
 
   const refresh = useCallback(async () => {
+    console.log('[Auth] refresh() called');
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
@@ -107,6 +108,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializedRef.current = true;
     
     let mounted = true;
+    // Safety timeout (10s) to avoid infinite loading if something goes wrong
+    const safety = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('[Auth] Safety timeout reached (10s). Forcing loading=false');
+        setLoading(false);
+      }
+    }, 10000);
     
     const initialize = async () => {
       try {
@@ -116,6 +124,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (hashParams.has('access_token')) {
           console.log('Procesando callback de OAuth...');
           await supabase.auth.getSession();
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        // Soportar flujo PKCE (?code=...)
+        const searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.has('code')) {
+          console.log('Intercambiando código PKCE por sesión...');
+          const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+          if (error) console.error('Error al intercambiar código PKCE', error);
+          else console.log('Sesión PKCE establecida', Boolean(data.session));
+          // Limpiar querystring
           window.history.replaceState({}, document.title, window.location.pathname);
         }
         
@@ -141,6 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
+      clearTimeout(safety);
     };
   }, []); // Array vacío - solo ejecutar al montar
 
