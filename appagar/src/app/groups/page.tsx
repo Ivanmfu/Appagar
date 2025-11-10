@@ -39,15 +39,20 @@ function GroupsContent() {
       if (!user?.id) return [] as Group[];
       const { data, error } = await supabase
         .from('group_members')
-        .select('group:groups(id, name, created_at)')
+        .select('groups(id, name, created_at)')
         .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('group(name)');
+        .eq('is_active', true);
 
       if (error) throw error;
 
-      const rows = (data ?? []) as { group: Group | null }[];
-      return rows.map((row) => row.group).filter((group): group is Group => Boolean(group));
+      const rows = (data ?? []) as { groups: Group | null }[];
+      // Extraer los grupos y ordenar localmente por nombre
+      const groups = rows
+        .map((row) => row.groups)
+        .filter((group): group is Group => Boolean(group))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      
+      return groups;
     },
   });
 
