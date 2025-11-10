@@ -119,34 +119,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initialize = async () => {
       try {
         console.log('Inicializando autenticación...');
-        // Verificar si hay un hash de OAuth
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        if (hashParams.has('access_token')) {
-          console.log('Procesando callback de OAuth...');
-          const access_token = hashParams.get('access_token') ?? undefined;
-          const refresh_token = hashParams.get('refresh_token') ?? undefined;
-          if (access_token && refresh_token) {
-            // Establecer sesión manualmente y persistirla
-            const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
-            if (error) console.error('Error al establecer sesión desde hash', error);
-            else console.log('Sesión establecida desde hash:', Boolean(data.session));
-          } else {
-            // Fallback: forzar lectura de sesión
-            await supabase.auth.getSession();
-          }
-          window.history.replaceState({}, document.title, window.location.pathname);
+        // Con detectSessionInUrl: true Supabase parsea automáticamente hash o code.
+        // Simplemente pedimos la sesión actual.
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error inicial obteniendo sesión', error);
+        } else {
+          console.log('Sesión inicial presente:', Boolean(data.session));
         }
-        // Soportar flujo PKCE (?code=...)
-        const searchParams = new URLSearchParams(window.location.search);
-        if (searchParams.has('code')) {
-          console.log('Intercambiando código PKCE por sesión...');
-          const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
-          if (error) console.error('Error al intercambiar código PKCE', error);
-          else console.log('Sesión PKCE establecida', Boolean(data.session));
-          // Limpiar querystring
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-        
         await refresh();
       } catch (error) {
         console.error('Error en inicialización:', error);
