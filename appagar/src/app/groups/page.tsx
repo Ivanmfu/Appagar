@@ -78,65 +78,95 @@ function GroupsContent() {
 
         console.log('[Groups] Inserting group:', JSON.stringify(groupPayload));
         
-        // Hacer insert sin select para evitar bloqueo
-        const { error: insertError } = await supabase
-          .from('groups')
-          .insert(groupPayload);
-        
-        console.log('[Groups] Insert error:', insertError);
-
-        if (insertError) {
-          console.error('[Groups] Group insert error:', insertError);
-          console.error('[Groups] Error code:', insertError.code);
-          console.error('[Groups] Error message:', insertError.message);
-          throw new Error(insertError.message || 'Error al crear el grupo');
+        // Usar API REST directamente con timeout agresivo
+        const session = await supabase.auth.getSession();
+        if (!session.data.session?.access_token) {
+          throw new Error('No hay sesión activa');
         }
 
-        console.log('[Groups] Insert successful, fetching created group...');
-        
-        // Consultar el grupo recién creado
-        const { data: groups, error: fetchError } = await supabase
-          .from('groups')
-          .select('id, name, created_at')
-          .eq('name', groupPayload.name)
-          .order('created_at', { ascending: false })
-          .limit(1);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-        console.log('[Groups] Fetch result:', groups, fetchError);
+        try {
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/groups?select=id,name,created_at`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                'Authorization': `Bearer ${session.data.session.access_token}`,
+                'Prefer': 'return=representation',
+              },
+              body: JSON.stringify(groupPayload),
+              signal: controller.signal,
+            }
+          );
 
-        if (fetchError || !groups || groups.length === 0) {
-          console.error('[Groups] Could not fetch created group');
-          throw new Error('Grupo creado pero no se pudo recuperar');
+          clearTimeout(timeoutId);
+          console.log('[Groups] API response status:', response.status);
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('[Groups] API error:', errorData);
+            throw new Error(errorData.message || `HTTP ${response.status}`);
+          }
+
+          const groups = await response.json();
+          console.log('[Groups] API response data:', groups);
+
+          if (!Array.isArray(groups) || groups.length === 0) {
+            throw new Error('No se recibió el grupo creado');
+          }
+
+          const group = groups[0] as Group;
+          console.log('[Groups] Group created:', group.id);
+
+          // Crear miembro con el mismo método
+          const memberPayload = {
+            group_id: group.id,
+            user_id: user.id,
+            is_active: true,
+          };
+
+          console.log('[Groups] Inserting member:', JSON.stringify(memberPayload));
+
+          const memberController = new AbortController();
+          const memberTimeoutId = setTimeout(() => memberController.abort(), 5000);
+
+          const memberResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/group_members`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                'Authorization': `Bearer ${session.data.session.access_token}`,
+              },
+              body: JSON.stringify(memberPayload),
+              signal: memberController.signal,
+            }
+          );
+
+          clearTimeout(memberTimeoutId);
+          console.log('[Groups] Member API response status:', memberResponse.status);
+
+          if (!memberResponse.ok) {
+            const errorData = await memberResponse.json();
+            console.error('[Groups] Member API error:', errorData);
+            throw new Error(errorData.message || 'Error al añadir miembro');
+          }
+
+          console.log('[Groups] Member created successfully');
+          return group;
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            console.error('[Groups] Request timeout');
+            throw new Error('La petición tardó demasiado (timeout 5s)');
+          }
+          throw fetchError;
         }
-
-        const group = groups[0] as Group;
-        console.log('[Groups] Group fetched successfully:', group.id);
-
-        const memberPayload = {
-          group_id: group.id,
-          user_id: user.id,
-          is_active: true,
-        };
-
-        console.log('[Groups] Inserting member:', JSON.stringify(memberPayload));
-        
-        const memberResult = await supabase
-          .from('group_members')
-          .insert(memberPayload);
-        
-        console.log('[Groups] Member result:', memberResult);
-        console.log('[Groups] Member error:', memberResult.error);
-
-        if (memberResult.error) {
-          console.error('[Groups] Member insert error:', memberResult.error);
-          console.error('[Groups] Member error code:', memberResult.error.code);
-          console.error('[Groups] Member error message:', memberResult.error.message);
-          throw new Error(memberResult.error.message || 'Error al añadir miembro');
-        }
-
-        console.log('[Groups] Member created successfully');
-        console.log('[Groups] Returning group:', group);
-        return group;
       } catch (error) {
         console.error('[Groups] Exception in mutationFn:', error);
         console.error('[Groups] Exception type:', error instanceof Error ? 'Error' : typeof error);
