@@ -180,6 +180,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               console.log('[Auth] exchange ok, has session:', Boolean(exData.session));
               console.log('[Auth] session data:', exData.session ? 'present' : 'null');
               console.log('[Auth] user:', exData.session?.user?.email);
+              // Actualizar estado inmediatamente tras exchange exitoso
+              if (exData.session) {
+                setSession(exData.session);
+                const ensuredProfile = await ensureProfile(exData.session.user);
+                setProfile(ensuredProfile ?? null);
+              }
             }
             // limpiar querystring
             console.log('[Auth] Cleaning query string...');
@@ -210,6 +216,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[Auth] About to call refresh...');
         await refresh();
         console.log('[Auth] refresh completed');
+        // Forzar loading=false al finalizar inicialización completa
+        console.log('[Auth] Forcing loading=false after initialization');
+        setLoading(false);
       } catch (error) {
         console.error('Error en inicialización:', error);
         setLoading(false);
