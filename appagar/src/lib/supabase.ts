@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Database } from './database.types';
 
-type Supabase = ReturnType<typeof createClient>;
+type Supabase = SupabaseClient<Database>;
 
 declare global {
   // eslint-disable-next-line no-var
@@ -22,7 +23,7 @@ export function getSupabaseClient(): Supabase {
   }
 
   if (!globalForSupabase.__supabaseClient) {
-    globalForSupabase.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    globalForSupabase.__supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey);
   }
 
   return globalForSupabase.__supabaseClient;
