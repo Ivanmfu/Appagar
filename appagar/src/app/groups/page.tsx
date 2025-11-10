@@ -78,11 +78,18 @@ function GroupsContent() {
 
         console.log('[Groups] Inserting group:', JSON.stringify(groupPayload));
         
-        const insertResult = await supabase
+        // Añadir timeout para evitar bloqueo infinito
+        const insertPromise = supabase
           .from('groups')
           .insert(groupPayload)
           .select('id, name, created_at')
           .single();
+        
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Insert timeout after 10s')), 10000)
+        );
+        
+        const insertResult = await Promise.race([insertPromise, timeoutPromise]) as any;
 
         console.log('[Groups] Insert result:', insertResult);
         console.log('[Groups] Insert data:', insertResult.data);

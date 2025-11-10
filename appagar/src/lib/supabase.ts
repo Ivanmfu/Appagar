@@ -32,6 +32,20 @@ export function getSupabaseClient(): Supabase {
         // Gestiona la sesión desde la URL (soporta ?code=... del flujo PKCE)
         detectSessionInUrl: true,
       },
+      global: {
+        headers: {
+          'x-client-info': 'appagar-web',
+        },
+      },
+      db: {
+        schema: 'public',
+      },
+      realtime: {
+        // Deshabilitar realtime para reducir conexiones en entorno estático
+        params: {
+          eventsPerSecond: 2,
+        },
+      },
     });
   }
 
