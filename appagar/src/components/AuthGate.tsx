@@ -10,6 +10,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [initialized, setInitialized] = useState(false);
+  const initializedRef = useRef(false);
   const supabase = getSupabaseClient();
 
   const refresh = useCallback(async () => {
@@ -101,12 +102,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   useEffect(() => {
-    if (initialized) return; // Solo inicializar una vez
+    // Solo inicializar una vez usando ref
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     
     let mounted = true;
     
     const initialize = async () => {
       try {
+        console.log('Inicializando autenticación...');
         // Verificar si hay un hash de OAuth
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         if (hashParams.has('access_token')) {
@@ -118,10 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await refresh();
       } catch (error) {
         console.error('Error en inicialización:', error);
-      } finally {
-        if (mounted) {
-          setInitialized(true);
-        }
+        setLoading(false);
       }
     };
 
@@ -134,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession);
       const ensuredProfile = await ensureProfile(newSession?.user ?? null);
       setProfile(ensuredProfile ?? null);
+      setLoading(false);
 
       if (!newSession && pathname !== '/login') {
         router.replace('/login');
@@ -146,7 +148,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [initialized, pathname, refresh, router, supabase]);
+  }, []); // Array vacío - solo ejecutar al montar
+
+  // Efecto separado para manejar redirecciones basadas en pathname
+  useEffect(() => {
+    if (loading) return; // Esperar a que termine de cargar
+    
+    if (!session && pathname !== '/login') {
+      router.replace('/login');
+    } else if (session && pathname === '/login') {
+      router.replace('/');
+    }
+  }, [pathname, session, loading, router]);
 
   const value = useMemo(
     () => ({ session, user: session?.user ?? null, profile, loading, refresh }),
