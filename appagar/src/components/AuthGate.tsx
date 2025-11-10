@@ -132,9 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const access_token = hashParams.get('access_token') ?? undefined;
             const refresh_token = hashParams.get('refresh_token') ?? undefined;
             if (access_token && refresh_token) {
-              const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
+              console.log('[Auth] tokens from hash -> access:', access_token.length, 'refresh:', refresh_token.length);
+              const { data: setData, error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
               if (setErr) console.error('[Auth] setSession error:', setErr);
-              else console.log('[Auth] setSession ok');
+              else console.log('[Auth] setSession ok, has session:', Boolean(setData.session));
+              const { data: userData, error: userErr } = await supabase.auth.getUser();
+              if (userErr) console.error('[Auth] getUser after setSession error:', userErr);
+              else console.log('[Auth] getUser after setSession ->', Boolean(userData.user));
               // limpiar hash para no perder tokens en futuras redirecciones
               window.history.replaceState({}, document.title, window.location.pathname);
             }
