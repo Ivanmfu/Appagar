@@ -27,8 +27,9 @@ export function getSupabaseClient(): Supabase {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        // Deja que el cliente gestione automáticamente la sesión desde la URL
-        // (soporta tanto hash access_token como PKCE ?code=...)
+        // Fuerza PKCE flow para todos los proveedores OAuth
+        flowType: 'pkce',
+        // Gestiona la sesión desde la URL (soporta ?code=... del flujo PKCE)
         detectSessionInUrl: true,
       },
     });

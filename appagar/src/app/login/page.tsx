@@ -99,10 +99,7 @@ export default function LoginPage() {
             access_type: 'offline',
             prompt: 'consent',
           },
-          // Usa flujo PKCE para que Google devuelva refresh_token
-          // (propiedad soportada por supabase-js v2, aunque algunos tipos antiguos no la incluyan)
-          // @ts-expect-error flowType existe en tiempo de ejecución
-          flowType: 'pkce',
+          // No es necesario especificar flowType aquí ya que lo forzamos globalmente en el cliente
         },
       });
 
