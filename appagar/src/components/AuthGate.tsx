@@ -153,34 +153,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             setProcessingOAuth(true);
             console.log('[Auth] Found ?code, exchanging for session...');
+            console.log('[Auth] code value:', searchParams.get('code'));
             // Construir URL completa para el intercambio (sin basePath en hash/search, solo origin + path)
             const callbackUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
             console.log('[Auth] callbackUrl for exchange:', callbackUrl);
-            const { data: exData, error: exErr } = await supabase.auth.exchangeCodeForSession(callbackUrl);
+            console.log('[Auth] About to call exchangeCodeForSession...');
+            const startTime = Date.now();
+            const result = await supabase.auth.exchangeCodeForSession(callbackUrl);
+            const elapsed = Date.now() - startTime;
+            console.log('[Auth] exchangeCodeForSession completed in', elapsed, 'ms');
+            console.log('[Auth] result:', result);
+            const { data: exData, error: exErr } = result;
             if (exErr) {
               console.error('[Auth] exchangeCodeForSession error:', exErr);
+              console.error('[Auth] error code:', exErr.code);
+              console.error('[Auth] error status:', exErr.status);
               console.error('[Auth] error details:', JSON.stringify(exErr, null, 2));
             } else {
               console.log('[Auth] exchange ok, has session:', Boolean(exData.session));
+              console.log('[Auth] session data:', exData.session ? 'present' : 'null');
               console.log('[Auth] user:', exData.session?.user?.email);
             }
             // limpiar querystring
+            console.log('[Auth] Cleaning query string...');
             window.history.replaceState({}, document.title, window.location.pathname);
+            console.log('[Auth] Query string cleaned');
           } catch (err) {
             console.error('[Auth] exception during exchange:', err);
+            console.error('[Auth] exception type:', typeof err);
+            console.error('[Auth] exception stringified:', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
           } finally {
+            console.log('[Auth] Setting processingOAuth to false');
             setProcessingOAuth(false);
           }
         }
 
         // Pedimos la sesión actual (si detectSessionInUrl funcionó, ya estará poblada)
+        console.log('[Auth] About to call getSession...');
         const { data, error } = await supabase.auth.getSession();
+        console.log('[Auth] getSession completed');
         if (error) {
           console.error('Error inicial obteniendo sesión', error);
         } else {
           console.log('Sesión inicial presente:', Boolean(data.session));
+          if (data.session) {
+            console.log('[Auth] Session user:', data.session.user.email);
+          }
         }
+        console.log('[Auth] About to call refresh...');
         await refresh();
+        console.log('[Auth] refresh completed');
       } catch (error) {
         console.error('Error en inicialización:', error);
         setLoading(false);
