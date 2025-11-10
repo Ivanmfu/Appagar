@@ -4,6 +4,7 @@ import AuthGate, { useAuth } from '@/components/AuthGate';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useMemo, useState } from 'react';
 
@@ -25,6 +26,7 @@ type GroupInsert = {
 
 function GroupsContent() {
   const { user, loading } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const showNewGroup = searchParams?.get('new') === '1';
@@ -63,6 +65,9 @@ function GroupsContent() {
 
       const groupPayload: GroupInsert = {
         name: name.trim(),
+        // Asegurar moneda base por defecto (algunas configuraciones la requieren)
+        // @ts-ignore base_currency existe en la tabla aunque sea opcional
+        base_currency: 'EUR',
       };
 
       const { data: group, error: groupError } = await supabase
@@ -98,7 +103,8 @@ function GroupsContent() {
         setGroupName('');
         setCreating(false);
         if (group) {
-          window.location.href = `/groups/${group.id}`;
+          // Usar router para respetar basePath
+          router.push(`/groups/${group.id}`);
         }
       },
     });
@@ -142,11 +148,11 @@ function GroupsContent() {
             </label>
             <div className="flex gap-3">
               <button
-                className="bg-black text-white px-4 py-2 rounded"
+                className="bg-black text-white px-4 py-2 rounded disabled:opacity-60"
                 disabled={createGroupMutation.isPending}
                 type="submit"
               >
-                Crear y entrar
+                {createGroupMutation.isPending ? 'Creando...' : 'Crear y entrar'}
               </button>
               <button
                 className="text-sm text-gray-600"
@@ -160,6 +166,9 @@ function GroupsContent() {
               <p className="text-sm text-red-600">
                 {(createGroupMutation.error as Error).message ?? 'No se pudo crear el grupo'}
               </p>
+            )}
+            {createGroupMutation.isSuccess && !createGroupMutation.error && (
+              <p className="text-sm text-green-600">Grupo creado correctamente.</p>
             )}
           </form>
         )}
