@@ -16,7 +16,7 @@ import {
 type Profile = {
   id: string;
   email?: string | null;
-  full_name?: string | null;
+  display_name?: string | null;
 };
 
 type AuthContextValue = {
@@ -35,7 +35,7 @@ async function ensureProfile(user: User | null) {
   const supabase = getSupabaseClient();
   const { data: existing, error: fetchError } = await supabase
     .from('profiles')
-    .select('id, email, full_name')
+    .select('id, email, display_name')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -51,13 +51,13 @@ async function ensureProfile(user: User | null) {
   const newProfile = {
     id: user.id,
     email: user.email,
-    full_name: (user.user_metadata as Record<string, unknown>)?.['full_name'] as string | undefined,
+    display_name: (user.user_metadata as Record<string, unknown>)?.['display_name'] as string | undefined,
   } satisfies Profile;
 
   const { data, error } = await getSupabaseClient()
     .from('profiles')
     .upsert(newProfile)
-    .select('id, email, full_name')
+    .select('id, email, display_name')
     .single();
 
   if (error) {

@@ -13,7 +13,7 @@ export default function HomePage() {
   return (
     <AuthGate>
       <main className="p-6 space-y-4">
-        <h1 className="text-2xl font-semibold">Hola, {profile?.full_name ?? user?.email ?? 'compañero/a'}</h1>
+        <h1 className="text-2xl font-semibold">Hola, {profile?.display_name ?? user?.email ?? 'compañero/a'}</h1>
         <p className="text-gray-600">
           Gestiona tus grupos, añade gastos y mantén el balance al día.
         </p>

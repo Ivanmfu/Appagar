@@ -5,7 +5,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useMemo, useState } from 'react';
 
 type Group = {
   id: string;
@@ -16,16 +16,14 @@ type Group = {
 type MemberInsert = {
   group_id: string;
   user_id: string;
-  role: string;
   is_active: boolean;
 };
 
 type GroupInsert = {
   name: string;
-  created_by: string;
 };
 
-export default function GroupsPage() {
+function GroupsContent() {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -60,12 +58,11 @@ export default function GroupsPage() {
 
       const groupPayload: GroupInsert = {
         name: name.trim(),
-        created_by: user.id,
       };
 
       const { data: group, error: groupError } = await supabase
         .from('groups')
-        .insert(groupPayload as Record<string, unknown>)
+        .insert(groupPayload)
         .select('id, name, created_at')
         .single();
 
@@ -74,13 +71,12 @@ export default function GroupsPage() {
       const memberPayload: MemberInsert = {
         group_id: group.id,
         user_id: user.id,
-        role: 'owner',
         is_active: true,
       };
 
       const { error: memberError } = await supabase
         .from('group_members')
-        .insert(memberPayload as Record<string, unknown>);
+        .insert(memberPayload);
       if (memberError) throw memberError;
 
       return group as Group;
@@ -193,5 +189,13 @@ export default function GroupsPage() {
         </section>
       </main>
     </AuthGate>
+  );
+}
+
+export default function GroupsPage() {
+  return (
+    <Suspense fallback={<div>Cargando...</div>}>
+      <GroupsContent />
+    </Suspense>
   );
 }
