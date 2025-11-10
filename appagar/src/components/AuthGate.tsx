@@ -153,11 +153,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             setProcessingOAuth(true);
             console.log('[Auth] Found ?code, exchanging for session...');
-            const { data: exData, error: exErr } = await supabase.auth.exchangeCodeForSession(window.location.href);
-            if (exErr) console.error('[Auth] exchangeCodeForSession error:', exErr);
-            else console.log('[Auth] exchange ok, has session:', Boolean(exData.session));
+            // Construir URL completa para el intercambio (sin basePath en hash/search, solo origin + path)
+            const callbackUrl = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+            console.log('[Auth] callbackUrl for exchange:', callbackUrl);
+            const { data: exData, error: exErr } = await supabase.auth.exchangeCodeForSession(callbackUrl);
+            if (exErr) {
+              console.error('[Auth] exchangeCodeForSession error:', exErr);
+              console.error('[Auth] error details:', JSON.stringify(exErr, null, 2));
+            } else {
+              console.log('[Auth] exchange ok, has session:', Boolean(exData.session));
+              console.log('[Auth] user:', exData.session?.user?.email);
+            }
             // limpiar querystring
             window.history.replaceState({}, document.title, window.location.pathname);
+          } catch (err) {
+            console.error('[Auth] exception during exchange:', err);
           } finally {
             setProcessingOAuth(false);
           }
