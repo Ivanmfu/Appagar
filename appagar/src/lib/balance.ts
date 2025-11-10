@@ -1,5 +1,8 @@
 import { getSupabaseClient } from '@/lib/supabase';
 import { simplifyDebts } from '@/lib/money';
+import { Database } from '@/lib/database.types';
+
+type GroupBalanceRow = Database['public']['Views']['group_balance']['Row'];
 
 export async function getGroupBalance(groupId: string) {
   const supabase = getSupabaseClient();
@@ -10,7 +13,7 @@ export async function getGroupBalance(groupId: string) {
 
   if (error) throw error;
 
-  const rows = data ?? [];
+  const rows = (data ?? []) as GroupBalanceRow[];
 
   // Convertir a formato para simplifyDebts
   const nets = rows.map((row) => ({

@@ -1,4 +1,7 @@
 import { getSupabaseClient } from '@/lib/supabase';
+import { Database } from '@/lib/database.types';
+
+type Expense = Database['public']['Tables']['expenses']['Row'];
 
 export type CreateExpenseInput = {
   groupId: string;
@@ -50,8 +53,10 @@ export async function createExpense({
     throw new Error('No se pudo crear el gasto');
   }
 
+  const expenseData = expense as Expense;
+
   const rows = shares.map((share) => ({
-    expense_id: expense.id,
+    expense_id: expenseData.id,
     user_id: share.userId,
     share_minor: share.shareCents,
     is_included: true,
@@ -63,5 +68,5 @@ export async function createExpense({
 
   if (participantsError) throw participantsError;
 
-  return expense;
+  return expenseData;
 }
