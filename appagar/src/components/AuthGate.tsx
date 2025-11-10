@@ -75,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [processingOAuth, setProcessingOAuth] = useState(false);
   const initializedRef = useRef(false);
   const supabase = getSupabaseClient();
 
@@ -122,8 +123,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('[Auth] href:', window.location.href);
         console.log('[Auth] search:', window.location.search);
         console.log('[Auth] hash:', window.location.hash);
-        // Con detectSessionInUrl: true Supabase parsea automáticamente hash o code.
-        // Simplemente pedimos la sesión actual.
+
+        // Fallback manual: si venimos con tokens en el hash, establecemos sesión inmediatamente
+        const hashParams = new URLSearchParams(window.location.hash.slice(1));
+        if (hashParams.has('access_token')) {
+          try {
+            setProcessingOAuth(true);
+            const access_token = hashParams.get('access_token') ?? undefined;
+            const refresh_token = hashParams.get('refresh_token') ?? undefined;
+            if (access_token && refresh_token) {
+              const { error: setErr } = await supabase.auth.setSession({ access_token, refresh_token });
+              if (setErr) console.error('[Auth] setSession error:', setErr);
+              else console.log('[Auth] setSession ok');
+              // limpiar hash para no perder tokens en futuras redirecciones
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
+          } finally {
+            setProcessingOAuth(false);
+          }
+        }
+
+        // Pedimos la sesión actual (si detectSessionInUrl funcionó, ya estará poblada)
         const { data, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Error inicial obteniendo sesión', error);
@@ -160,7 +180,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log('Redirect effect - loading:', loading, 'session:', !!session, 'pathname:', pathname);
     
-    if (loading) return; // Esperar a que termine de cargar
+    // Evitar redirigir mientras procesamos callback OAuth o aún cargamos
+    if (loading || processingOAuth) return;
     
     if (!session && pathname !== '/login') {
       console.log('No session, redirecting to login');
@@ -169,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Has session, redirecting to home');
       router.replace('/');
     }
-  }, [pathname, session, loading, router]);
+  }, [pathname, session, loading, processingOAuth, router]);
 
   const value = useMemo(
     () => ({ session, user: session?.user ?? null, profile, loading, refresh }),
