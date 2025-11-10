@@ -159,7 +159,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('[Auth] callbackUrl for exchange:', callbackUrl);
             console.log('[Auth] About to call exchangeCodeForSession...');
             const startTime = Date.now();
-            const result = await supabase.auth.exchangeCodeForSession(callbackUrl);
+            
+            // Añadir timeout de 8 segundos para evitar bloqueo infinito
+            const exchangePromise = supabase.auth.exchangeCodeForSession(callbackUrl);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Exchange timeout after 8s')), 8000)
+            );
+            
+            const result = await Promise.race([exchangePromise, timeoutPromise]) as any;
             const elapsed = Date.now() - startTime;
             console.log('[Auth] exchangeCodeForSession completed in', elapsed, 'ms');
             console.log('[Auth] result:', result);
@@ -230,10 +237,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Efecto separado para manejar redirecciones basadas en pathname
   useEffect(() => {
-    console.log('Redirect effect - loading:', loading, 'session:', !!session, 'pathname:', pathname);
+    console.log('Redirect effect - loading:', loading, 'session:', !!session, 'pathname:', pathname, 'processingOAuth:', processingOAuth);
     
     // Evitar redirigir mientras procesamos callback OAuth o aún cargamos
-    if (loading || processingOAuth) return;
+    if (loading || processingOAuth) {
+      console.log('Redirect effect - skipping (loading or processing OAuth)');
+      return;
+    }
     
     if (!session && pathname !== '/login') {
       console.log('No session, redirecting to login');
