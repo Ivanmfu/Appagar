@@ -119,6 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initialize = async () => {
       try {
         console.log('Inicializando autenticación...');
+        console.log('[Auth] href:', window.location.href);
+        console.log('[Auth] search:', window.location.search);
+        console.log('[Auth] hash:', window.location.hash);
         // Con detectSessionInUrl: true Supabase parsea automáticamente hash o code.
         // Simplemente pedimos la sesión actual.
         const { data, error } = await supabase.auth.getSession();
