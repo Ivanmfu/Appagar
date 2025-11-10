@@ -78,41 +78,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('Error al recuperar la sesión', error);
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error al recuperar la sesión', error);
+        setSession(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      const nextSession = data.session ?? null;
+      setSession(nextSession);
+      const ensuredProfile = await ensureProfile(nextSession?.user ?? null);
+      setProfile(ensuredProfile ?? null);
+    } catch (error) {
+      console.error('Error inesperado al recuperar sesión:', error);
       setSession(null);
       setProfile(null);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const nextSession = data.session ?? null;
-    setSession(nextSession);
-    const ensuredProfile = await ensureProfile(nextSession?.user ?? null);
-    setProfile(ensuredProfile ?? null);
-    setLoading(false);
   }, [supabase]);
 
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+    
+    // Timeout de seguridad para no quedarse cargando infinitamente
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('Timeout de carga, forzando finalización');
+        setLoading(false);
+      }
+    }, 5000); // 5 segundos máximo
     
     // Manejar el hash de OAuth en la URL
     const handleOAuthCallback = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      if (hashParams.has('access_token')) {
-        // Hay un token de OAuth en la URL, procesarlo
-        await supabase.auth.getSession();
-        // Limpiar el hash de la URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+      try {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        if (hashParams.has('access_token')) {
+          console.log('Procesando callback de OAuth...');
+          // Hay un token de OAuth en la URL, procesarlo
+          await supabase.auth.getSession();
+          // Limpiar el hash de la URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (error) {
+        console.error('Error procesando OAuth callback:', error);
       }
     };
 
-    handleOAuthCallback().then(() => refresh()).finally(() => {
-      if (mounted) setLoading(false);
-    });
+    handleOAuthCallback()
+      .then(() => refresh())
+      .catch((error) => {
+        console.error('Error en inicialización:', error);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+        clearTimeout(safetyTimeout);
+      });
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log('Auth state changed:', event);
       setSession(newSession);
       const ensuredProfile = await ensureProfile(newSession?.user ?? null);
       setProfile(ensuredProfile ?? null);
@@ -126,9 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       listener.subscription.unsubscribe();
     };
-  }, [pathname, refresh, router, supabase]);
+  }, [pathname, refresh, router, supabase, loading]);
 
   const value = useMemo(
     () => ({ session, user: session?.user ?? null, profile, loading, refresh }),
@@ -148,9 +177,21 @@ export function useAuth() {
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { loading, user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
 
   if (loading) {
-    return <div className="p-6 text-sm text-gray-500">Cargando sesión...</div>;
+    return (
+      <div className="p-6 text-center space-y-4">
+        <div className="text-gray-500">Comprobando sesión...</div>
+        <div className="text-xs text-gray-400">Si esto tarda mucho, recarga la página</div>
+      </div>
+    );
   }
 
   if (!user) {
