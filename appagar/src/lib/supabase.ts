@@ -23,7 +23,13 @@ export function getSupabaseClient(): Supabase {
   }
 
   if (!globalForSupabase.__supabaseClient) {
-    globalForSupabase.__supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey);
+    globalForSupabase.__supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: false, // lo manejamos manualmente
+      },
+    });
   }
 
   return globalForSupabase.__supabaseClient;

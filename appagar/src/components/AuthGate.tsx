@@ -123,7 +123,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         if (hashParams.has('access_token')) {
           console.log('Procesando callback de OAuth...');
-          await supabase.auth.getSession();
+          const access_token = hashParams.get('access_token') ?? undefined;
+          const refresh_token = hashParams.get('refresh_token') ?? undefined;
+          if (access_token && refresh_token) {
+            // Establecer sesión manualmente y persistirla
+            const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+            if (error) console.error('Error al establecer sesión desde hash', error);
+            else console.log('Sesión establecida desde hash:', Boolean(data.session));
+          } else {
+            // Fallback: forzar lectura de sesión
+            await supabase.auth.getSession();
+          }
           window.history.replaceState({}, document.title, window.location.pathname);
         }
         // Soportar flujo PKCE (?code=...)
