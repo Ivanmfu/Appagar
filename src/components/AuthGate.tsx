@@ -37,27 +37,39 @@ async function ensureProfile(user: User | null) {
     return null;
   }
 
+  // WORKAROUND: Usar perfil del auth.user directamente mientras arreglamos RLS
+  const fallbackProfile = {
+    id: user.id,
+    email: user.email,
+    display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || null,
+  };
+
   try {
     const supabase = getSupabaseClient();
-    console.log('[ensureProfile] Fetching profile from DB...');
-    const { data: existing, error: fetchError } = await supabase
+    console.log('[ensureProfile] Fetching profile from DB with 3s timeout...');
+    
+    // Crear promesa con timeout de 3 segundos
+    const fetchPromise = supabase
       .from('profiles')
       .select('id, email, display_name')
       .eq('id', user.id)
       .maybeSingle();
 
+    const timeoutPromise = new Promise<never>((_, reject) => 
+      setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
+    );
+
+    const { data: existing, error: fetchError } = await Promise.race([
+      fetchPromise,
+      timeoutPromise
+    ]) as Awaited<typeof fetchPromise>;
+
     console.log('[ensureProfile] DB query result:', { existing, fetchError });
 
     if (fetchError) {
       console.error('[Profile] Error fetching profile:', fetchError);
-      // Retornar perfil básico si falla la consulta
-      const fallback = {
-        id: user.id,
-        email: user.email,
-        display_name: user.user_metadata?.display_name || null,
-      };
-      console.log('[ensureProfile] Returning fallback after fetch error:', fallback);
-      return fallback;
+      console.log('[ensureProfile] Returning fallback after fetch error');
+      return fallbackProfile;
     }
 
     if (existing) {
@@ -65,41 +77,34 @@ async function ensureProfile(user: User | null) {
       return existing;
     }
 
-    // Crear nuevo perfil
-    console.log('[ensureProfile] No profile found, creating...');
+    // Intentar crear perfil (sin esperar)
+    console.log('[ensureProfile] No profile found, attempting background create...');
     const newProfile = {
       id: user.id,
       email: user.email,
-      display_name: (user.user_metadata as Record<string, unknown>)?.['display_name'] as string | undefined,
-    } satisfies Profile;
+      display_name: fallbackProfile.display_name,
+    };
 
-    const { data, error } = await getSupabaseClient()
+    // Intentar crear en background sin bloquear
+    getSupabaseClient()
       .from('profiles')
       .upsert(newProfile)
       .select('id, email, display_name')
-      .single();
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[Profile] Background upsert error:', error);
+        } else {
+          console.log('[Profile] Background upsert success:', data);
+        }
+      });
 
-    console.log('[ensureProfile] Upsert result:', { data, error });
-
-    if (error) {
-      console.error('[Profile] Error creating profile:', error);
-      // Retornar el perfil básico si falla la creación
-      console.log('[ensureProfile] Returning newProfile after upsert error:', newProfile);
-      return newProfile;
-    }
-
-    console.log('[ensureProfile] Successfully created:', data ?? newProfile);
-    return data ?? newProfile;
+    console.log('[ensureProfile] Returning fallback immediately');
+    return fallbackProfile;
   } catch (error) {
-    console.error('[Profile] Unexpected error:', error);
-    // Retornar perfil básico en caso de error
-    const fallback = {
-      id: user.id,
-      email: user.email,
-      display_name: user.user_metadata?.display_name || null,
-    };
-    console.log('[ensureProfile] Returning fallback after exception:', fallback);
-    return fallback;
+    console.error('[Profile] Error or timeout:', error);
+    console.log('[ensureProfile] Returning fallback after exception');
+    return fallbackProfile;
   }
 }
 
