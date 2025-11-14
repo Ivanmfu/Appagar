@@ -109,6 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     let mounted = true;
     
+    // Safety timeout: forzar loading=false después de 3 segundos
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('[Auth] Safety timeout alcanzado, forzando loading=false');
+        setLoading(false);
+      }
+    }, 3000);
+    
     const initialize = async () => {
       try {
         console.log('Inicializando autenticación...');
@@ -146,27 +154,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       
       if (event === 'SIGNED_IN') {
-        console.log('[Auth] Usuario autenticado vía', event);
+        console.log('[Auth] Usuario autenticado vía SIGNED_IN');
+        setLoading(true); // Activar loading mientras procesamos
         setSession(newSession);
-        const ensuredProfile = await ensureProfile(newSession?.user ?? null);
-        setProfile(ensuredProfile ?? null);
-        setLoading(false);
+        try {
+          const ensuredProfile = await ensureProfile(newSession?.user ?? null);
+          setProfile(ensuredProfile ?? null);
+        } catch (error) {
+          console.error('[Auth] Error en ensureProfile:', error);
+        } finally {
+          console.log('[Auth] Finalizando SIGNED_IN, setting loading=false');
+          setLoading(false);
+        }
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('[Auth] Token refrescado');
         setSession(newSession);
-        setLoading(false);
+        if (!loading) setLoading(false);
       } else if (event === 'SIGNED_OUT') {
         console.log('[Auth] Usuario cerró sesión');
         setSession(null);
         setProfile(null);
         setLoading(false);
       } else if (event === 'INITIAL_SESSION') {
-        console.log('[Auth] Sesión inicial detectada');
+        console.log('[Auth] Sesión inicial detectada vía INITIAL_SESSION');
         if (newSession) {
           setSession(newSession);
-          const ensuredProfile = await ensureProfile(newSession.user);
-          setProfile(ensuredProfile ?? null);
+          try {
+            const ensuredProfile = await ensureProfile(newSession.user);
+            setProfile(ensuredProfile ?? null);
+          } catch (error) {
+            console.error('[Auth] Error en ensureProfile:', error);
+          }
         }
+        console.log('[Auth] Finalizando INITIAL_SESSION, setting loading=false');
         setLoading(false);
       }
     });
@@ -174,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
     };
   }, []); // Array vacío - solo ejecutar al montar
 
