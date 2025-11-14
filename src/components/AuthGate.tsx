@@ -103,38 +103,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   useEffect(() => {
-    // Solo inicializar una vez usando ref
     if (initializedRef.current) return;
     initializedRef.current = true;
     
     let mounted = true;
     
     const initialize = async () => {
-      try {
-        console.log('Inicializando autenticación...');
-        console.log('[Auth] URL:', window.location.href);
-        
-        // Primero, permitir que Supabase procese cualquier callback OAuth en la URL
-        // Esperar un poco para que el SDK procese el código de la URL
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Obtener la sesión inicial
-        const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
+      if (mounted) {
         if (error) {
-          console.error('Error obteniendo sesión inicial:', error);
-          setLoading(false);
-        } else if (data.session) {
-          console.log('Sesión inicial encontrada:', data.session.user.email);
-          setSession(data.session);
-          const ensuredProfile = await ensureProfile(data.session.user);
-          setProfile(ensuredProfile ?? null);
-          setLoading(false);
-        } else {
-          console.log('No hay sesión inicial');
-          setLoading(false);
+          console.error('Error getting session:', error);
         }
-      } catch (error) {
-        console.error('Error en inicialización:', error);
+        setSession(data.session);
+        if (data.session) {
+          const profile = await ensureProfile(data.session.user);
+          setProfile(profile);
+        }
         setLoading(false);
       }
     };
@@ -142,74 +126,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialize();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log('[Auth] State change:', event, 'Session:', !!newSession, 'User:', newSession?.user?.email);
       if (!mounted) return;
+      console.log('[Auth] Event:', event);
       
-      if (event === 'SIGNED_IN') {
-        console.log('[Auth] Usuario autenticado vía SIGNED_IN');
-        setLoading(true); // Activar loading mientras procesamos
-        setSession(newSession);
-        try {
-          const ensuredProfile = await ensureProfile(newSession?.user ?? null);
-          setProfile(ensuredProfile ?? null);
-        } catch (error) {
-          console.error('[Auth] Error en ensureProfile:', error);
-        } finally {
-          console.log('[Auth] Finalizando SIGNED_IN, setting loading=false');
-          setLoading(false);
-        }
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log('[Auth] Token refrescado');
-        setSession(newSession);
-        if (!loading) setLoading(false);
-      } else if (event === 'SIGNED_OUT') {
-        console.log('[Auth] Usuario cerró sesión');
-        setSession(null);
+      setSession(newSession);
+      if (newSession?.user) {
+        const profile = await ensureProfile(newSession.user);
+        setProfile(profile);
+      } else {
         setProfile(null);
-        setLoading(false);
-      } else if (event === 'INITIAL_SESSION') {
-        console.log('[Auth] Sesión inicial detectada vía INITIAL_SESSION');
-        if (newSession) {
-          setSession(newSession);
-          try {
-            const ensuredProfile = await ensureProfile(newSession.user);
-            setProfile(ensuredProfile ?? null);
-          } catch (error) {
-            console.error('[Auth] Error en ensureProfile:', error);
-          }
-        }
-        console.log('[Auth] Finalizando INITIAL_SESSION, setting loading=false');
-        setLoading(false);
       }
+      setLoading(false);
     });
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []); // Array vacío - solo ejecutar al montar
+  }, [supabase]);
 
-  // Efecto separado para manejar redirecciones basadas en pathname
+  // Efecto separado para manejar redirecciones
   useEffect(() => {
-    console.log('[Redirect] loading:', loading, 'session:', !!session, 'pathname:', pathname);
+    if (loading) return;
     
-    if (loading) {
-      console.log('[Redirect] Esperando carga...');
-      return;
+    if (!session && pathname !== '/login') {
+      router.replace('/login');
+    } else if (session && pathname === '/login') {
+      router.replace('/');
     }
-    
-    // Dar tiempo para que se procese el callback OAuth antes de redirigir
-    const timer = setTimeout(() => {
-      if (!session && pathname !== '/login') {
-        console.log('[Redirect] Sin sesión, redirigiendo a login');
-        router.replace('/login');
-      } else if (session && pathname === '/login') {
-        console.log('[Redirect] Con sesión, redirigiendo a home');
-        router.replace('/');
-      }
-    }, 200);
-    
-    return () => clearTimeout(timer);
   }, [pathname, session, loading, router]);
 
   const value = useMemo(
