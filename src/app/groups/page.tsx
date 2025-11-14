@@ -4,6 +4,7 @@ import AuthGate, { useAuth } from '@/components/AuthGate';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useMemo, useState } from 'react';
 
@@ -25,6 +26,7 @@ type GroupInsert = {
 
 function GroupsContent() {
   const { user, loading } = useAuth();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const showNewGroup = searchParams?.get('new') === '1';
@@ -39,62 +41,173 @@ function GroupsContent() {
       if (!user?.id) return [] as Group[];
       const { data, error } = await supabase
         .from('group_members')
-        .select('group:groups(id, name, created_at)')
+        .select('groups(id, name, created_at)')
         .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('group(name)');
+        .eq('is_active', true);
 
       if (error) throw error;
 
-      const rows = (data ?? []) as { group: Group | null }[];
-      return rows.map((row) => row.group).filter((group): group is Group => Boolean(group));
+      const rows = (data ?? []) as { groups: Group | null }[];
+      // Extraer los grupos y ordenar localmente por nombre
+      const groups = rows
+        .map((row) => row.groups)
+        .filter((group): group is Group => Boolean(group))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      
+      return groups;
     },
   });
 
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
-      if (!user?.id) throw new Error('Debes iniciar sesión');
-      if (!name.trim()) throw new Error('Introduce un nombre de grupo');
+      try {
+        console.log('[Groups] Starting group creation, user:', user?.id);
+        if (!user?.id) {
+          console.error('[Groups] No user ID found');
+          throw new Error('Debes iniciar sesión');
+        }
+        if (!name.trim()) {
+          console.error('[Groups] Empty group name');
+          throw new Error('Introduce un nombre de grupo');
+        }
 
-      const groupPayload: GroupInsert = {
-        name: name.trim(),
-      };
+        const groupPayload = {
+          name: name.trim(),
+          base_currency: 'EUR',
+        };
 
-      const { data: group, error: groupError } = await supabase
-        .from('groups')
-        .insert(groupPayload)
-        .select('id, name, created_at')
-        .single();
+        console.log('[Groups] Inserting group:', JSON.stringify(groupPayload));
+        
+        // Usar API REST directamente con timeout agresivo
+        const session = await supabase.auth.getSession();
+        if (!session.data.session?.access_token) {
+          throw new Error('No hay sesión activa');
+        }
 
-      if (groupError) throw groupError;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-      const memberPayload: MemberInsert = {
-        group_id: group.id,
-        user_id: user.id,
-        is_active: true,
-      };
+        try {
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/groups?select=id,name,created_at`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                'Authorization': `Bearer ${session.data.session.access_token}`,
+                'Prefer': 'return=representation',
+              },
+              body: JSON.stringify(groupPayload),
+              signal: controller.signal,
+            }
+          );
 
-      const { error: memberError } = await supabase
-        .from('group_members')
-        .insert(memberPayload);
-      if (memberError) throw memberError;
+          clearTimeout(timeoutId);
+          console.log('[Groups] API response status:', response.status);
 
-      return group as Group;
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('[Groups] API error:', errorData);
+            throw new Error(errorData.message || `HTTP ${response.status}`);
+          }
+
+          const groups = await response.json();
+          console.log('[Groups] API response data:', groups);
+
+          if (!Array.isArray(groups) || groups.length === 0) {
+            throw new Error('No se recibió el grupo creado');
+          }
+
+          const group = groups[0] as Group;
+          console.log('[Groups] Group created:', group.id);
+
+          // Crear miembro con el mismo método
+          const memberPayload = {
+            group_id: group.id,
+            user_id: user.id,
+            is_active: true,
+          };
+
+          console.log('[Groups] Inserting member:', JSON.stringify(memberPayload));
+
+          const memberController = new AbortController();
+          const memberTimeoutId = setTimeout(() => memberController.abort(), 5000);
+
+          const memberResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/group_members`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                'Authorization': `Bearer ${session.data.session.access_token}`,
+              },
+              body: JSON.stringify(memberPayload),
+              signal: memberController.signal,
+            }
+          );
+
+          clearTimeout(memberTimeoutId);
+          console.log('[Groups] Member API response status:', memberResponse.status);
+
+          if (!memberResponse.ok) {
+            const errorData = await memberResponse.json();
+            console.error('[Groups] Member API error:', errorData);
+            throw new Error(errorData.message || 'Error al añadir miembro');
+          }
+
+          console.log('[Groups] Member created successfully');
+          return group;
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            console.error('[Groups] Request timeout');
+            throw new Error('La petición tardó demasiado (timeout 5s)');
+          }
+          throw fetchError;
+        }
+      } catch (error) {
+        console.error('[Groups] Exception in mutationFn:', error);
+        console.error('[Groups] Exception type:', error instanceof Error ? 'Error' : typeof error);
+        if (error instanceof Error) {
+          console.error('[Groups] Exception message:', error.message);
+          console.error('[Groups] Exception stack:', error.stack);
+        }
+        throw error;
+      }
     },
-    onSuccess: async () => {
+    onSuccess: async (group) => {
+      console.log('[Groups] Mutation onSuccess, group:', group);
+      console.log('[Groups] Invalidating queries for user:', user?.id);
       await queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
+      console.log('[Groups] Queries invalidated');
+    },
+    onError: (error) => {
+      console.error('[Groups] Mutation onError:', error);
+      console.error('[Groups] Error instanceof Error:', error instanceof Error);
+      if (error instanceof Error) {
+        console.error('[Groups] Error message:', error.message);
+      }
     },
   });
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
+    console.log('[Groups] Form submitted, group name:', groupName);
     createGroupMutation.mutate(groupName, {
       onSuccess: (group) => {
+        console.log('[Groups] onSuccess callback, group:', group);
         setGroupName('');
         setCreating(false);
         if (group) {
-          window.location.href = `/groups/${group.id}`;
+          console.log('[Groups] Navigating to group:', group.id);
+          // Usar router para respetar basePath
+          router.push(`/groups/${group.id}`);
         }
+      },
+      onError: (error) => {
+        console.error('[Groups] onError callback:', error);
       },
     });
   }
@@ -137,11 +250,11 @@ function GroupsContent() {
             </label>
             <div className="flex gap-3">
               <button
-                className="bg-black text-white px-4 py-2 rounded"
+                className="bg-black text-white px-4 py-2 rounded disabled:opacity-60"
                 disabled={createGroupMutation.isPending}
                 type="submit"
               >
-                Crear y entrar
+                {createGroupMutation.isPending ? 'Creando...' : 'Crear y entrar'}
               </button>
               <button
                 className="text-sm text-gray-600"
@@ -155,6 +268,9 @@ function GroupsContent() {
               <p className="text-sm text-red-600">
                 {(createGroupMutation.error as Error).message ?? 'No se pudo crear el grupo'}
               </p>
+            )}
+            {createGroupMutation.isSuccess && !createGroupMutation.error && (
+              <p className="text-sm text-green-600">Grupo creado correctamente.</p>
             )}
           </form>
         )}

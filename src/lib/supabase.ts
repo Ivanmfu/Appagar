@@ -13,13 +13,6 @@ const globalForSupabase = globalThis as typeof globalThis & {
 };
 
 export function getSupabaseClient(): Supabase {
-  // Only initialize in the browser, not during build time
-  if (typeof window === 'undefined') {
-    // During SSG/build time, return a stub that will never be called
-    // since all components using it are client-side with 'use client'
-    return null as unknown as Supabase;
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -30,7 +23,30 @@ export function getSupabaseClient(): Supabase {
   }
 
   if (!globalForSupabase.__supabaseClient) {
-    globalForSupabase.__supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey);
+    globalForSupabase.__supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        // Fuerza PKCE flow para todos los proveedores OAuth
+        flowType: 'pkce',
+        // Gestiona la sesión desde la URL (soporta ?code=... del flujo PKCE)
+        detectSessionInUrl: true,
+      },
+      global: {
+        headers: {
+          'x-client-info': 'appagar-web',
+        },
+      },
+      db: {
+        schema: 'public',
+      },
+      realtime: {
+        // Deshabilitar realtime para reducir conexiones en entorno estático
+        params: {
+          eventsPerSecond: 2,
+        },
+      },
+    });
   }
 
   return globalForSupabase.__supabaseClient;

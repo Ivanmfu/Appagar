@@ -10,6 +10,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -74,49 +75,134 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [processingOAuth, setProcessingOAuth] = useState(false);
+  const initializedRef = useRef(false);
   const supabase = getSupabaseClient();
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      console.error('Error al recuperar la sesión', error);
+    console.log('[Auth] refresh() called');
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error al recuperar la sesión', error);
+        setSession(null);
+        setProfile(null);
+        return;
+      }
+
+      const nextSession = data.session ?? null;
+      setSession(nextSession);
+      const ensuredProfile = await ensureProfile(nextSession?.user ?? null);
+      setProfile(ensuredProfile ?? null);
+    } catch (error) {
+      console.error('Error inesperado al recuperar sesión:', error);
       setSession(null);
       setProfile(null);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const nextSession = data.session ?? null;
-    setSession(nextSession);
-    const ensuredProfile = await ensureProfile(nextSession?.user ?? null);
-    setProfile(ensuredProfile ?? null);
-    setLoading(false);
   }, [supabase]);
 
   useEffect(() => {
+    // Solo inicializar una vez usando ref
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
     let mounted = true;
-    refresh().finally(() => {
-      if (mounted) setLoading(false);
-    });
+    // Safety timeout (10s) to avoid infinite loading if something goes wrong
+    const safety = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('[Auth] Safety timeout reached (10s). Forcing loading=false');
+        setLoading(false);
+      }
+    }, 10000);
+    
+    const initialize = async () => {
+      try {
+        console.log('Inicializando autenticación...');
+        console.log('[Auth] href:', window.location.href);
+        console.log('[Auth] search:', window.location.search);
+        console.log('[Auth] hash:', window.location.hash);
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+        // Limpiar código de la URL inmediatamente para evitar reusos
+        const searchParams = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.slice(1));
+        
+        if (searchParams.has('code') || hashParams.has('access_token')) {
+          console.log('[Auth] OAuth callback detected, cleaning URL...');
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        // Con detectSessionInUrl: true y flowType: pkce, Supabase maneja automáticamente
+        // el intercambio PKCE en segundo plano. Solo necesitamos esperar un poco.
+        console.log('[Auth] Waiting for Supabase to process callback...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Pedimos la sesión actual
+        console.log('[Auth] About to call getSession...');
+        const { data, error } = await supabase.auth.getSession();
+        console.log('[Auth] getSession completed');
+        if (error) {
+          console.error('Error inicial obteniendo sesión', error);
+        } else {
+          console.log('Sesión inicial presente:', Boolean(data.session));
+          if (data.session) {
+            console.log('[Auth] Session user:', data.session.user.email);
+            setSession(data.session);
+            const ensuredProfile = await ensureProfile(data.session.user);
+            setProfile(ensuredProfile ?? null);
+          }
+        }
+        
+        console.log('[Auth] About to call refresh...');
+        await refresh();
+        console.log('[Auth] refresh completed');
+        // Forzar loading=false al finalizar inicialización completa
+        console.log('[Auth] Forcing loading=false after initialization');
+        setLoading(false);
+      } catch (error) {
+        console.error('Error en inicialización:', error);
+        setLoading(false);
+      }
+    };
+
+    initialize();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      console.log('Auth state changed:', event, 'Has session:', !!newSession);
+      if (!mounted) return;
+      
       setSession(newSession);
       const ensuredProfile = await ensureProfile(newSession?.user ?? null);
       setProfile(ensuredProfile ?? null);
-
-      if (!newSession && pathname !== '/login') {
-        router.replace('/login');
-      } else if (newSession && pathname === '/login') {
-        router.replace('/');
-      }
+      setLoading(false);
     });
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
+      clearTimeout(safety);
     };
-  }, [pathname, refresh, router, supabase]);
+  }, []); // Array vacío - solo ejecutar al montar
+
+  // Efecto separado para manejar redirecciones basadas en pathname
+  useEffect(() => {
+    console.log('Redirect effect - loading:', loading, 'session:', !!session, 'pathname:', pathname, 'processingOAuth:', processingOAuth);
+    
+    // Evitar redirigir mientras procesamos callback OAuth o aún cargamos
+    if (loading || processingOAuth) {
+      console.log('Redirect effect - skipping (loading or processing OAuth)');
+      return;
+    }
+    
+    if (!session && pathname !== '/login') {
+      console.log('No session, redirecting to login');
+      router.replace('/login');
+    } else if (session && pathname === '/login') {
+      console.log('Has session, redirecting to home');
+      router.replace('/');
+    }
+  }, [pathname, session, loading, processingOAuth, router]);
 
   const value = useMemo(
     () => ({ session, user: session?.user ?? null, profile, loading, refresh }),
@@ -136,9 +222,24 @@ export function useAuth() {
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const { loading, user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    console.log('AuthGate - loading:', loading, 'user:', !!user);
+    if (!loading && !user) {
+      console.log('AuthGate - Redirigiendo a login');
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
 
   if (loading) {
-    return <div className="p-6 text-sm text-gray-500">Cargando sesión...</div>;
+    return (
+      <div className="p-6 text-center space-y-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <div className="text-gray-500">Comprobando sesión...</div>
+        <div className="text-xs text-gray-400">Si esto tarda mucho, recarga la página</div>
+      </div>
+    );
   }
 
   if (!user) {
