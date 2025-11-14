@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const initializedRef = useRef(false);
-  const supabase = getSupabaseClient();
+  const supabase = useMemo(() => getSupabaseClient(), []);
 
   const refresh = useCallback(async () => {
     console.log('[Auth] refresh() called');
@@ -109,16 +109,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     
     const initialize = async () => {
+      console.log('[Auth] Initializing...');
       const { data, error } = await supabase.auth.getSession();
+      console.log('[Auth] getSession result:', { hasSession: !!data.session, error });
+      
       if (mounted) {
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('[Auth] Error getting session:', error);
         }
         setSession(data.session);
         if (data.session) {
-          const profile = await ensureProfile(data.session.user);
-          setProfile(profile);
+          console.log('[Auth] User found:', data.session.user.email);
+          try {
+            const profile = await ensureProfile(data.session.user);
+            setProfile(profile);
+            console.log('[Auth] Profile loaded');
+          } catch (err) {
+            console.error('[Auth] Error loading profile:', err);
+          }
         }
+        console.log('[Auth] Setting loading=false');
         setLoading(false);
       }
     };
@@ -127,15 +137,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!mounted) return;
-      console.log('[Auth] Event:', event);
+      console.log('[Auth] Event:', event, 'Has session:', !!newSession);
       
       setSession(newSession);
       if (newSession?.user) {
-        const profile = await ensureProfile(newSession.user);
-        setProfile(profile);
+        console.log('[Auth] Loading profile for:', newSession.user.email);
+        try {
+          const profile = await ensureProfile(newSession.user);
+          setProfile(profile);
+          console.log('[Auth] Profile loaded in event handler');
+        } catch (err) {
+          console.error('[Auth] Error in event handler:', err);
+        }
       } else {
         setProfile(null);
       }
+      console.log('[Auth] Event handler setting loading=false');
       setLoading(false);
     });
 
@@ -143,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, []);
 
   // Efecto separado para manejar redirecciones
   useEffect(() => {
