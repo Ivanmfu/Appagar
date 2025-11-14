@@ -31,31 +31,42 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 async function ensureProfile(user: User | null) {
-  if (!user) return null;
+  console.log('[ensureProfile] Called with user:', user?.email);
+  if (!user) {
+    console.log('[ensureProfile] No user, returning null');
+    return null;
+  }
 
   try {
     const supabase = getSupabaseClient();
+    console.log('[ensureProfile] Fetching profile from DB...');
     const { data: existing, error: fetchError } = await supabase
       .from('profiles')
       .select('id, email, display_name')
       .eq('id', user.id)
       .maybeSingle();
 
+    console.log('[ensureProfile] DB query result:', { existing, fetchError });
+
     if (fetchError) {
       console.error('[Profile] Error fetching profile:', fetchError);
       // Retornar perfil básico si falla la consulta
-      return {
+      const fallback = {
         id: user.id,
         email: user.email,
         display_name: user.user_metadata?.display_name || null,
       };
+      console.log('[ensureProfile] Returning fallback after fetch error:', fallback);
+      return fallback;
     }
 
     if (existing) {
+      console.log('[ensureProfile] Profile found:', existing);
       return existing;
     }
 
     // Crear nuevo perfil
+    console.log('[ensureProfile] No profile found, creating...');
     const newProfile = {
       id: user.id,
       email: user.email,
@@ -68,21 +79,27 @@ async function ensureProfile(user: User | null) {
       .select('id, email, display_name')
       .single();
 
+    console.log('[ensureProfile] Upsert result:', { data, error });
+
     if (error) {
       console.error('[Profile] Error creating profile:', error);
       // Retornar el perfil básico si falla la creación
+      console.log('[ensureProfile] Returning newProfile after upsert error:', newProfile);
       return newProfile;
     }
 
+    console.log('[ensureProfile] Successfully created:', data ?? newProfile);
     return data ?? newProfile;
   } catch (error) {
     console.error('[Profile] Unexpected error:', error);
     // Retornar perfil básico en caso de error
-    return {
+    const fallback = {
       id: user.id,
       email: user.email,
       display_name: user.user_metadata?.display_name || null,
     };
+    console.log('[ensureProfile] Returning fallback after exception:', fallback);
+    return fallback;
   }
 }
 
@@ -122,41 +139,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
-    
-    let mounted = true;
-    
-    const initialize = async () => {
+
+    let isMounted = true;
+
+    // Safety timeout: force loading=false after 10 seconds
+    const timeoutId = setTimeout(() => {
+      if (isMounted) {
+        console.warn('[Auth] TIMEOUT: Forcing loading=false after 10 seconds');
+        setLoading(false);
+      }
+    }, 10000);
+
+    (async () => {
       console.log('[Auth] Initializing...');
       try {
         const { data, error } = await supabase.auth.getSession();
-        console.log('[Auth] getSession result:', { hasSession: !!data.session, error });
-        
-        if (mounted) {
-          if (error) {
-            console.error('[Auth] Error getting session:', error);
-          }
-          setSession(data.session);
-          if (data.session) {
-            console.log('[Auth] User found:', data.session.user.email);
-            const profile = await ensureProfile(data.session.user);
-            setProfile(profile);
-            console.log('[Auth] Profile loaded');
-          }
+        console.log('[Auth] getSession result:', { 
+          hasSession: !!data.session, 
+          error,
+          userId: data.session?.user?.id,
+          email: data.session?.user?.email
+        });
+
+        if (!isMounted) return;
+
+        if (error) {
+          console.error('[Auth] Error getting session:', error);
         }
-      } catch (err) {
-        console.error('[Auth] Error in initialize:', err);
+
+        setSession(data.session);
+
+        if (data.session) {
+          console.log('[Auth] User found:', data.session.user.email);
+          console.log('[Auth] Calling ensureProfile...');
+          const profile = await ensureProfile(data.session.user);
+          console.log('[Auth] ensureProfile returned:', profile);
+          setProfile(profile);
+          console.log('[Auth] Profile loaded and state updated');
+        }
+      } catch (error) {
+        console.error('[Auth] Error in initialize:', error);
       } finally {
-        if (mounted) {
+        clearTimeout(timeoutId);
+        if (isMounted) {
           console.log('[Auth] Setting loading=false');
           setLoading(false);
         }
       }
-    };
-
-    initialize();
+    })();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (!mounted) return;
+      if (!isMounted) return;
       console.log('[Auth] Event:', event, 'Has session:', !!newSession);
       
       try {
@@ -178,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
-      mounted = false;
+      isMounted = false;
       listener.subscription.unsubscribe();
     };
   }, []);
