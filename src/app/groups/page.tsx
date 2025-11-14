@@ -60,44 +60,61 @@ function GroupsContent() {
 
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
-      if (!user?.id) throw new Error('Debes iniciar sesión');
-      if (!name.trim()) throw new Error('Introduce un nombre de grupo');
-
-      console.log('[Groups] Creating group:', name);
-
-      // Insertar grupo
-      const { data: group, error: groupError } = await supabase
-        .from('groups')
-        .insert({
-          name: name.trim(),
-          base_currency: 'EUR',
-        })
-        .select('id, name, created_at')
-        .single();
-
-      if (groupError) {
-        console.error('[Groups] Error creating group:', groupError);
-        throw groupError;
+      console.log('[Groups] mutationFn started');
+      if (!user?.id) {
+        console.error('[Groups] No user ID');
+        throw new Error('Debes iniciar sesión');
+      }
+      if (!name.trim()) {
+        console.error('[Groups] Empty name');
+        throw new Error('Introduce un nombre de grupo');
       }
 
-      console.log('[Groups] Group created:', group.id);
+      console.log('[Groups] Creating group:', name, 'User:', user.id);
 
-      // Añadir al usuario como miembro
-      const { error: memberError } = await supabase
-        .from('group_members')
-        .insert({
-          group_id: group.id,
-          user_id: user.id,
-          is_active: true,
-        });
+      try {
+        // Insertar grupo
+        const { data: group, error: groupError } = await supabase
+          .from('groups')
+          .insert({
+            name: name.trim(),
+            base_currency: 'EUR',
+          })
+          .select('id, name, created_at')
+          .single();
 
-      if (memberError) {
-        console.error('[Groups] Error adding member:', memberError);
-        throw memberError;
+        if (groupError) {
+          console.error('[Groups] Error creating group:', groupError);
+          throw new Error(groupError.message || 'Error al crear el grupo');
+        }
+
+        if (!group) {
+          console.error('[Groups] No group returned');
+          throw new Error('No se recibió el grupo creado');
+        }
+
+        console.log('[Groups] Group created:', group.id);
+
+        // Añadir al usuario como miembro
+        const { error: memberError } = await supabase
+          .from('group_members')
+          .insert({
+            group_id: group.id,
+            user_id: user.id,
+            is_active: true,
+          });
+
+        if (memberError) {
+          console.error('[Groups] Error adding member:', memberError);
+          throw new Error(memberError.message || 'Error al añadir miembro');
+        }
+
+        console.log('[Groups] Member added successfully');
+        return group as Group;
+      } catch (error) {
+        console.error('[Groups] Exception:', error);
+        throw error;
       }
-
-      console.log('[Groups] Member added successfully');
-      return group as Group;
     },
     onSuccess: async (group) => {
       console.log('[Groups] Success! Refreshing list...');

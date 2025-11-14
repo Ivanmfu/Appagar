@@ -109,14 +109,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     let mounted = true;
     
-    // Safety timeout: forzar loading=false después de 3 segundos
-    const safetyTimeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('[Auth] Safety timeout alcanzado, forzando loading=false');
-        setLoading(false);
-      }
-    }, 3000);
-    
     const initialize = async () => {
       try {
         console.log('Inicializando autenticación...');
@@ -194,7 +186,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
-      clearTimeout(safetyTimeout);
     };
   }, []); // Array vacío - solo ejecutar al montar
 
