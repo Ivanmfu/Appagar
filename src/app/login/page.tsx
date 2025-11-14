@@ -91,20 +91,11 @@ export default function LoginPage() {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Vuelve al login para procesar el callback en una ruta estable
-          redirectTo: `${window.location.origin}/Appagar/login`,
-          // Solicitar scopes estándar y refresh token
-          scopes: 'openid email profile',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-          // No es necesario especificar flowType aquí ya que lo forzamos globalmente en el cliente
+          redirectTo: `${window.location.origin}/Appagar`,
         },
       });
 
       if (authError) throw authError;
-      // El navegador será redirigido a Google, no necesitamos hacer nada más
     } catch (error: any) {
       console.error(error);
       setError(error.message || 'Error al iniciar sesión con Google');

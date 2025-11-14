@@ -75,7 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [processingOAuth, setProcessingOAuth] = useState(false);
   const initializedRef = useRef(false);
   const supabase = getSupabaseClient();
 
@@ -109,56 +108,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializedRef.current = true;
     
     let mounted = true;
-    // Safety timeout (10s) to avoid infinite loading if something goes wrong
-    const safety = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('[Auth] Safety timeout reached (10s). Forcing loading=false');
-        setLoading(false);
-      }
-    }, 10000);
     
     const initialize = async () => {
       try {
         console.log('Inicializando autenticación...');
-        console.log('[Auth] href:', window.location.href);
-        console.log('[Auth] search:', window.location.search);
-        console.log('[Auth] hash:', window.location.hash);
-
-        // Limpiar código de la URL inmediatamente para evitar reusos
-        const searchParams = new URLSearchParams(window.location.search);
-        const hashParams = new URLSearchParams(window.location.hash.slice(1));
         
-        if (searchParams.has('code') || hashParams.has('access_token')) {
-          console.log('[Auth] OAuth callback detected, cleaning URL...');
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-
-        // Con detectSessionInUrl: true y flowType: pkce, Supabase maneja automáticamente
-        // el intercambio PKCE en segundo plano. Solo necesitamos esperar un poco.
-        console.log('[Auth] Waiting for Supabase to process callback...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Pedimos la sesión actual
-        console.log('[Auth] About to call getSession...');
+        // Obtener la sesión inicial
         const { data, error } = await supabase.auth.getSession();
-        console.log('[Auth] getSession completed');
         if (error) {
-          console.error('Error inicial obteniendo sesión', error);
-        } else {
-          console.log('Sesión inicial presente:', Boolean(data.session));
-          if (data.session) {
-            console.log('[Auth] Session user:', data.session.user.email);
-            setSession(data.session);
-            const ensuredProfile = await ensureProfile(data.session.user);
-            setProfile(ensuredProfile ?? null);
-          }
+          console.error('Error obteniendo sesión inicial:', error);
+        } else if (data.session) {
+          console.log('Sesión inicial encontrada:', data.session.user.email);
+          setSession(data.session);
+          const ensuredProfile = await ensureProfile(data.session.user);
+          setProfile(ensuredProfile ?? null);
         }
         
-        console.log('[Auth] About to call refresh...');
-        await refresh();
-        console.log('[Auth] refresh completed');
-        // Forzar loading=false al finalizar inicialización completa
-        console.log('[Auth] Forcing loading=false after initialization');
         setLoading(false);
       } catch (error) {
         console.error('Error en inicialización:', error);
@@ -172,26 +137,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Auth state changed:', event, 'Has session:', !!newSession);
       if (!mounted) return;
       
-      setSession(newSession);
-      const ensuredProfile = await ensureProfile(newSession?.user ?? null);
-      setProfile(ensuredProfile ?? null);
-      setLoading(false);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        console.log('Usuario autenticado:', newSession?.user.email);
+        setSession(newSession);
+        const ensuredProfile = await ensureProfile(newSession?.user ?? null);
+        setProfile(ensuredProfile ?? null);
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        console.log('Usuario cerró sesión');
+        setSession(null);
+        setProfile(null);
+        setLoading(false);
+      }
     });
 
     return () => {
       mounted = false;
       listener.subscription.unsubscribe();
-      clearTimeout(safety);
     };
   }, []); // Array vacío - solo ejecutar al montar
 
   // Efecto separado para manejar redirecciones basadas en pathname
   useEffect(() => {
-    console.log('Redirect effect - loading:', loading, 'session:', !!session, 'pathname:', pathname, 'processingOAuth:', processingOAuth);
+    console.log('Redirect effect - loading:', loading, 'session:', !!session, 'pathname:', pathname);
     
-    // Evitar redirigir mientras procesamos callback OAuth o aún cargamos
-    if (loading || processingOAuth) {
-      console.log('Redirect effect - skipping (loading or processing OAuth)');
+    if (loading) {
+      console.log('Redirect effect - skipping (still loading)');
       return;
     }
     
@@ -202,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Has session, redirecting to home');
       router.replace('/');
     }
-  }, [pathname, session, loading, processingOAuth, router]);
+  }, [pathname, session, loading, router]);
 
   const value = useMemo(
     () => ({ session, user: session?.user ?? null, profile, loading, refresh }),
