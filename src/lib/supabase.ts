@@ -27,10 +27,10 @@ export function getSupabaseClient(): Supabase {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        // Fuerza PKCE flow para todos los proveedores OAuth
         flowType: 'pkce',
-        // Gestiona la sesión desde la URL (soporta ?code=... del flujo PKCE)
         detectSessionInUrl: true,
+        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+        storageKey: 'appagar-auth',
       },
       global: {
         headers: {
@@ -41,7 +41,6 @@ export function getSupabaseClient(): Supabase {
         schema: 'public',
       },
       realtime: {
-        // Deshabilitar realtime para reducir conexiones en entorno estático
         params: {
           eventsPerSecond: 2,
         },
