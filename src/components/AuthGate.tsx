@@ -33,40 +33,57 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 async function ensureProfile(user: User | null) {
   if (!user) return null;
 
-  const supabase = getSupabaseClient();
-  const { data: existing, error: fetchError } = await supabase
-    .from('profiles')
-    .select('id, email, display_name')
-    .eq('id', user.id)
-    .maybeSingle();
+  try {
+    const supabase = getSupabaseClient();
+    const { data: existing, error: fetchError } = await supabase
+      .from('profiles')
+      .select('id, email, display_name')
+      .eq('id', user.id)
+      .maybeSingle();
 
-  if (fetchError) {
-    console.error('Error al comprobar el perfil', fetchError);
-    return existing ?? null;
+    if (fetchError) {
+      console.error('[Profile] Error fetching profile:', fetchError);
+      // Retornar perfil básico si falla la consulta
+      return {
+        id: user.id,
+        email: user.email,
+        display_name: user.user_metadata?.display_name || null,
+      };
+    }
+
+    if (existing) {
+      return existing;
+    }
+
+    // Crear nuevo perfil
+    const newProfile = {
+      id: user.id,
+      email: user.email,
+      display_name: (user.user_metadata as Record<string, unknown>)?.['display_name'] as string | undefined,
+    } satisfies Profile;
+
+    const { data, error } = await getSupabaseClient()
+      .from('profiles')
+      .upsert(newProfile)
+      .select('id, email, display_name')
+      .single();
+
+    if (error) {
+      console.error('[Profile] Error creating profile:', error);
+      // Retornar el perfil básico si falla la creación
+      return newProfile;
+    }
+
+    return data ?? newProfile;
+  } catch (error) {
+    console.error('[Profile] Unexpected error:', error);
+    // Retornar perfil básico en caso de error
+    return {
+      id: user.id,
+      email: user.email,
+      display_name: user.user_metadata?.display_name || null,
+    };
   }
-
-  if (existing) {
-    return existing;
-  }
-
-  const newProfile = {
-    id: user.id,
-    email: user.email,
-    display_name: (user.user_metadata as Record<string, unknown>)?.['display_name'] as string | undefined,
-  } satisfies Profile;
-
-  const { data, error } = await getSupabaseClient()
-    .from('profiles')
-    .upsert(newProfile)
-    .select('id, email, display_name')
-    .single();
-
-  if (error) {
-    console.error('Error al crear el perfil', error);
-    return existing ?? newProfile;
-  }
-
-  return data ?? newProfile;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -110,26 +127,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     const initialize = async () => {
       console.log('[Auth] Initializing...');
-      const { data, error } = await supabase.auth.getSession();
-      console.log('[Auth] getSession result:', { hasSession: !!data.session, error });
-      
-      if (mounted) {
-        if (error) {
-          console.error('[Auth] Error getting session:', error);
-        }
-        setSession(data.session);
-        if (data.session) {
-          console.log('[Auth] User found:', data.session.user.email);
-          try {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        console.log('[Auth] getSession result:', { hasSession: !!data.session, error });
+        
+        if (mounted) {
+          if (error) {
+            console.error('[Auth] Error getting session:', error);
+          }
+          setSession(data.session);
+          if (data.session) {
+            console.log('[Auth] User found:', data.session.user.email);
             const profile = await ensureProfile(data.session.user);
             setProfile(profile);
             console.log('[Auth] Profile loaded');
-          } catch (err) {
-            console.error('[Auth] Error loading profile:', err);
           }
         }
-        console.log('[Auth] Setting loading=false');
-        setLoading(false);
+      } catch (err) {
+        console.error('[Auth] Error in initialize:', err);
+      } finally {
+        if (mounted) {
+          console.log('[Auth] Setting loading=false');
+          setLoading(false);
+        }
       }
     };
 
@@ -139,21 +159,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       console.log('[Auth] Event:', event, 'Has session:', !!newSession);
       
-      setSession(newSession);
-      if (newSession?.user) {
-        console.log('[Auth] Loading profile for:', newSession.user.email);
-        try {
+      try {
+        setSession(newSession);
+        if (newSession?.user) {
+          console.log('[Auth] Loading profile for:', newSession.user.email);
           const profile = await ensureProfile(newSession.user);
           setProfile(profile);
           console.log('[Auth] Profile loaded in event handler');
-        } catch (err) {
-          console.error('[Auth] Error in event handler:', err);
+        } else {
+          setProfile(null);
         }
-      } else {
-        setProfile(null);
+      } catch (err) {
+        console.error('[Auth] Error in event handler:', err);
+      } finally {
+        console.log('[Auth] Event handler setting loading=false');
+        setLoading(false);
       }
-      console.log('[Auth] Event handler setting loading=false');
-      setLoading(false);
     });
 
     return () => {
