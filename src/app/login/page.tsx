@@ -1,7 +1,7 @@
 'use client';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 
 type AuthMode = 'login' | 'signup' | 'magic-link';
 
@@ -13,6 +13,18 @@ export default function LoginPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [processingOAuth, setProcessingOAuth] = useState(false);
+
+  // Detectar si estamos procesando un callback OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+    
+    if (params.has('code') || hashParams.has('access_token')) {
+      console.log('[Login] OAuth callback detectado, procesando...');
+      setProcessingOAuth(true);
+    }
+  }, []);
 
   async function handleEmailPassword() {
     if (!email || !password) {
@@ -101,6 +113,18 @@ export default function LoginPage() {
       setError(error.message || 'Error al iniciar sesión con Google');
       setLoading(false);
     }
+  }
+
+  if (processingOAuth) {
+    return (
+      <main className="p-6 max-w-md mx-auto mt-12 space-y-4 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+        <h1 className="text-2xl font-semibold">Completando inicio de sesión...</h1>
+        <p className="text-gray-600">
+          Estamos procesando tu autenticación con Google.
+        </p>
+      </main>
+    );
   }
 
   if (sent) {

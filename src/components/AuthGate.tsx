@@ -112,19 +112,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initialize = async () => {
       try {
         console.log('Inicializando autenticación...');
+        console.log('[Auth] URL:', window.location.href);
+        
+        // Primero, permitir que Supabase procese cualquier callback OAuth en la URL
+        // Esperar un poco para que el SDK procese el código de la URL
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Obtener la sesión inicial
         const { data, error } = await supabase.auth.getSession();
         if (error) {
           console.error('Error obteniendo sesión inicial:', error);
+          setLoading(false);
         } else if (data.session) {
           console.log('Sesión inicial encontrada:', data.session.user.email);
           setSession(data.session);
           const ensuredProfile = await ensureProfile(data.session.user);
           setProfile(ensuredProfile ?? null);
+          setLoading(false);
+        } else {
+          console.log('No hay sesión inicial');
+          setLoading(false);
         }
-        
-        setLoading(false);
       } catch (error) {
         console.error('Error en inicialización:', error);
         setLoading(false);
@@ -134,19 +142,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialize();
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log('Auth state changed:', event, 'Has session:', !!newSession);
+      console.log('[Auth] State change:', event, 'Session:', !!newSession, 'User:', newSession?.user?.email);
       if (!mounted) return;
       
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        console.log('Usuario autenticado:', newSession?.user.email);
+      if (event === 'SIGNED_IN') {
+        console.log('[Auth] Usuario autenticado vía', event);
         setSession(newSession);
         const ensuredProfile = await ensureProfile(newSession?.user ?? null);
         setProfile(ensuredProfile ?? null);
         setLoading(false);
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('[Auth] Token refrescado');
+        setSession(newSession);
+        setLoading(false);
       } else if (event === 'SIGNED_OUT') {
-        console.log('Usuario cerró sesión');
+        console.log('[Auth] Usuario cerró sesión');
         setSession(null);
         setProfile(null);
+        setLoading(false);
+      } else if (event === 'INITIAL_SESSION') {
+        console.log('[Auth] Sesión inicial detectada');
+        if (newSession) {
+          setSession(newSession);
+          const ensuredProfile = await ensureProfile(newSession.user);
+          setProfile(ensuredProfile ?? null);
+        }
         setLoading(false);
       }
     });
@@ -159,20 +179,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Efecto separado para manejar redirecciones basadas en pathname
   useEffect(() => {
-    console.log('Redirect effect - loading:', loading, 'session:', !!session, 'pathname:', pathname);
+    console.log('[Redirect] loading:', loading, 'session:', !!session, 'pathname:', pathname);
     
     if (loading) {
-      console.log('Redirect effect - skipping (still loading)');
+      console.log('[Redirect] Esperando carga...');
       return;
     }
     
-    if (!session && pathname !== '/login') {
-      console.log('No session, redirecting to login');
-      router.replace('/login');
-    } else if (session && pathname === '/login') {
-      console.log('Has session, redirecting to home');
-      router.replace('/');
-    }
+    // Dar tiempo para que se procese el callback OAuth antes de redirigir
+    const timer = setTimeout(() => {
+      if (!session && pathname !== '/login') {
+        console.log('[Redirect] Sin sesión, redirigiendo a login');
+        router.replace('/login');
+      } else if (session && pathname === '/login') {
+        console.log('[Redirect] Con sesión, redirigiendo a home');
+        router.replace('/');
+      }
+    }, 200);
+    
+    return () => clearTimeout(timer);
   }, [pathname, session, loading, router]);
 
   const value = useMemo(
