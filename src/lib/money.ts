@@ -14,28 +14,46 @@ export function splitEvenlyInCents(totalCents: number, n: number): number[] {
   return res;
 }
 
-type Net = { userId: string; net: number }; // net en céntimos (positivo cobra, negativo debe)
-export function simplifyDebts(nets: Net[]): { from: string; to: string; amount: number }[] {
-  const debtors = [...nets]
-    .filter((n) => n.net < 0)
-    .map((debtor) => ({ id: debtor.userId, amt: -debtor.net }))
-    .sort((a, b) => b.amt - a.amt);
+export type UserBalance = {
+  userId: string;
+  netBalanceCents: number; // positivo recibe, negativo debe
+};
 
-  const creditors = [...nets]
-    .filter((n) => n.net > 0)
-    .map((creditor) => ({ id: creditor.userId, amt: creditor.net }))
-    .sort((a, b) => b.amt - a.amt);
+export type SimplifiedTransfer = {
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+};
 
-  const tx: { from: string; to: string; amount: number }[] = [];
+export function simplifyDebts(balances: UserBalance[]): SimplifiedTransfer[] {
+  const debtors = balances
+    .filter((balance) => balance.netBalanceCents < 0)
+    .map((balance) => ({ userId: balance.userId, remaining: -balance.netBalanceCents }))
+    .sort((a, b) => b.remaining - a.remaining);
+
+  const creditors = balances
+    .filter((balance) => balance.netBalanceCents > 0)
+    .map((balance) => ({ userId: balance.userId, remaining: balance.netBalanceCents }))
+    .sort((a, b) => b.remaining - a.remaining);
+
+  const transfers: SimplifiedTransfer[] = [];
   let i = 0;
   let j = 0;
+
   while (i < debtors.length && j < creditors.length) {
-    const pay = Math.min(debtors[i].amt, creditors[j].amt);
-    if (pay > 0) tx.push({ from: debtors[i].id, to: creditors[j].id, amount: pay });
-    debtors[i].amt -= pay;
-    creditors[j].amt -= pay;
-    if (debtors[i].amt === 0) i++;
-    if (creditors[j].amt === 0) j++;
+    const debtor = debtors[i];
+    const creditor = creditors[j];
+    const amount = Math.min(debtor.remaining, creditor.remaining);
+
+    if (amount > 0) {
+      transfers.push({ fromUserId: debtor.userId, toUserId: creditor.userId, amountCents: amount });
+      debtor.remaining -= amount;
+      creditor.remaining -= amount;
+    }
+
+    if (debtor.remaining === 0) i += 1;
+    if (creditor.remaining === 0) j += 1;
   }
-  return tx;
+
+  return transfers;
 }

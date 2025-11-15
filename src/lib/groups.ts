@@ -92,7 +92,6 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     { data: groupRows, error: groupsError },
     { data: memberRows, error: membersError },
     { data: expenseRows, error: expensesError },
-    { data: netRows, error: netError },
   ] = await Promise.all([
     supabase
       .from('groups')
@@ -105,19 +104,24 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
       .eq('is_active', true),
     supabase
       .from('expenses')
-      .select('group_id, date, created_at, amount_base_minor')
+      .select('id, group_id, payer_id, date, created_at, amount_base_minor, amount_minor')
       .in('group_id', groupIds),
-    supabase
-      .from('group_balance')
-      .select('group_id, net_minor')
-      .in('group_id', groupIds)
-      .eq('user_id', userId),
   ]);
 
   if (groupsError) throw groupsError;
   if (membersError) throw membersError;
   if (expensesError) throw expensesError;
-  if (netError) throw netError;
+
+  const expenseIds = (expenseRows ?? []).map((row) => row.id);
+
+  const { data: participantRows, error: participantError } = expenseIds.length
+    ? await supabase
+        .from('expense_participants')
+        .select('expense_id, user_id, share_minor, is_included')
+        .in('expense_id', expenseIds)
+    : { data: [] as ExpenseParticipantRow[], error: null };
+
+  if (participantError) throw participantError;
 
   const memberCountMap = new Map<string, number>();
   (memberRows ?? []).forEach((row) => {
@@ -127,11 +131,12 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   const lastExpenseMap = new Map<string, string | null>();
   const totalSpendMap = new Map<string, number>();
   for (const expense of expenseRows ?? []) {
+    const amountMinor = expense.amount_base_minor ?? expense.amount_minor ?? 0;
     if (!lastExpenseMap.has(expense.group_id)) {
       lastExpenseMap.set(expense.group_id, expense.date ?? expense.created_at ?? null);
     }
     const currentTotal = totalSpendMap.get(expense.group_id) ?? 0;
-    totalSpendMap.set(expense.group_id, currentTotal + (expense.amount_base_minor ?? 0));
+    totalSpendMap.set(expense.group_id, currentTotal + amountMinor);
 
     const previousLast = lastExpenseMap.get(expense.group_id);
     const candidate = expense.date ?? expense.created_at ?? null;
@@ -144,9 +149,50 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     }
   }
 
+  const perGroupUserTotals = new Map<string, Map<string, { paid: number; owed: number }>>();
+  const ensureUserEntry = (groupId: string, memberId: string | null) => {
+    if (!memberId) return null;
+    if (!perGroupUserTotals.has(groupId)) {
+      perGroupUserTotals.set(groupId, new Map());
+    }
+    const groupMap = perGroupUserTotals.get(groupId)!;
+    if (!groupMap.has(memberId)) {
+      groupMap.set(memberId, { paid: 0, owed: 0 });
+    }
+    return groupMap.get(memberId)!;
+  };
+
+  (groupIds ?? []).forEach((groupId) => {
+    ensureUserEntry(groupId, userId) ?? undefined;
+  });
+
+  const expenseById = new Map((expenseRows ?? []).map((expense) => [expense.id, expense] as const));
+
+  (expenseRows ?? []).forEach((expense) => {
+    const amountMinor = expense.amount_base_minor ?? expense.amount_minor ?? 0;
+    const paidEntry = ensureUserEntry(expense.group_id, expense.payer_id);
+    if (paidEntry) {
+      paidEntry.paid += amountMinor;
+    }
+  });
+
+  const participantList = (participantRows ?? []) as ExpenseParticipantRow[];
+  participantList.forEach((participant) => {
+    if (participant.is_included === false) return;
+    const expense = expenseById.get(participant.expense_id);
+    if (!expense) return;
+    const owedEntry = ensureUserEntry(expense.group_id, participant.user_id);
+    if (owedEntry) {
+      owedEntry.owed += participant.share_minor ?? 0;
+    }
+  });
+
   const userNetMap = new Map<string, number>();
-  (netRows ?? []).forEach((row) => {
-    userNetMap.set(row.group_id, row.net_minor ?? 0);
+  perGroupUserTotals.forEach((userTotals, groupId) => {
+    const stats = userTotals.get(userId ?? '');
+    if (stats) {
+      userNetMap.set(groupId, stats.paid - stats.owed);
+    }
   });
 
   return (groupRows ?? []).map((group) => ({

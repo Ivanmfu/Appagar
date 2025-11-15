@@ -31,13 +31,13 @@ export function BalanceSummary({ baseCurrency, members, balance }: Props) {
           </p>
         )}
         {balance.balances.map((entry) => {
-          const profile = memberMap.get(entry.user_id);
+          const profile = memberMap.get(entry.userId);
           const name = profile?.displayName ?? profile?.email ?? 'Miembro';
-          const amount = formatCurrency(entry.net_minor, baseCurrency);
-          const positive = entry.net_minor >= 0;
+          const amount = formatCurrency(entry.netBalanceCents, baseCurrency);
+          const positive = entry.netBalanceCents >= 0;
           return (
             <div
-              key={entry.user_id}
+              key={entry.userId}
               className={`border rounded p-3 text-sm ${positive ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}
             >
               <p className="font-medium">{name}</p>
@@ -49,16 +49,16 @@ export function BalanceSummary({ baseCurrency, members, balance }: Props) {
         })}
       </div>
 
-      {balance.transactions.length > 0 && (
+      {balance.transfers.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-semibold">Liquidaciones sugeridas</h4>
           <ul className="space-y-1 text-sm">
-            {balance.transactions.map((tx, index) => {
-              const from = memberMap.get(tx.from)?.displayName ?? memberMap.get(tx.from)?.email ?? 'Alguien';
-              const to = memberMap.get(tx.to)?.displayName ?? memberMap.get(tx.to)?.email ?? 'Alguien';
+            {balance.transfers.map((tx, index) => {
+              const from = memberMap.get(tx.fromUserId)?.displayName ?? memberMap.get(tx.fromUserId)?.email ?? 'Alguien';
+              const to = memberMap.get(tx.toUserId)?.displayName ?? memberMap.get(tx.toUserId)?.email ?? 'Alguien';
               return (
-                <li key={`${tx.from}-${tx.to}-${index}`}>
-                  {from} → {to}: {formatCurrency(tx.amount, baseCurrency)}
+                <li key={`${tx.fromUserId}-${tx.toUserId}-${index}`}>
+                  {from} → {to}: {formatCurrency(tx.amountCents, baseCurrency)}
                 </li>
               );
             })}

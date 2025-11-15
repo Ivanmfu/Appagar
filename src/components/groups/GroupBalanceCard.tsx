@@ -46,80 +46,60 @@ export function GroupBalanceCard({
     userNetMinor,
     memberSnapshots,
   } = useMemo(() => {
-    const totals = {
-      totalGroupSpendMinor: 0,
-      totalUserPaidMinor: 0,
-      totalUserShareMinor: 0,
-      userNetMinor: 0,
-      memberSnapshots: [] as {
-        userId: string;
-        name: string;
-        netMinor: number;
-        paidMinor: number;
-        shareMinor: number;
-      }[],
-    };
-
-    const perMember = new Map<string, { paid: number; share: number }>();
-
-    expenses.forEach((expense) => {
+    const totalGroupSpendMinor = expenses.reduce((sum, expense) => {
       const baseAmount = expense.amountBaseMinor ?? expense.amountMinor;
-      totals.totalGroupSpendMinor += baseAmount;
+      return sum + baseAmount;
+    }, 0);
 
-      const payerEntry = perMember.get(expense.payerId) ?? { paid: 0, share: 0 };
-      payerEntry.paid += baseAmount;
-      perMember.set(expense.payerId, payerEntry);
+    const balanceByUser = new Map(
+      balance.balances.map((entry) => [entry.userId, entry] as const),
+    );
 
-      if (expense.payerId === currentUserId) {
-        totals.totalUserPaidMinor += baseAmount;
-      }
+    const totalUserPaidMinor = currentUserId
+      ? balanceByUser.get(currentUserId)?.totalPaidCents ?? 0
+      : 0;
+    const totalUserShareMinor = currentUserId
+      ? balanceByUser.get(currentUserId)?.totalOwedCents ?? 0
+      : 0;
+    const userNetMinor = currentUserId
+      ? balanceByUser.get(currentUserId)?.netBalanceCents ?? 0
+      : 0;
 
-      expense.participants.forEach((participant) => {
-        const entry = perMember.get(participant.userId) ?? { paid: 0, share: 0 };
-        entry.share += participant.shareMinor;
-        perMember.set(participant.userId, entry);
-
-        if (participant.userId === currentUserId) {
-          totals.totalUserShareMinor += participant.shareMinor;
-        }
-      });
-    });
-
-    const balanceMap = new Map(balance.balances.map((entry) => [entry.user_id, entry.net_minor] as const));
-    if (currentUserId) {
-      totals.userNetMinor = balanceMap.get(currentUserId) ?? 0;
-    }
-
-    members.forEach((member) => {
+    const memberSnapshots = members.map((member) => {
       const identity = member.displayName ?? member.email ?? 'Integrante';
-      const aggregates = perMember.get(member.userId) ?? { paid: 0, share: 0 };
-      const net = balanceMap.get(member.userId) ?? 0;
-      totals.memberSnapshots.push({
+      const metrics = balanceByUser.get(member.userId);
+      return {
         userId: member.userId,
         name: identity,
-        netMinor: net,
-        paidMinor: aggregates.paid,
-        shareMinor: aggregates.share,
-      });
+        netMinor: metrics?.netBalanceCents ?? 0,
+        paidMinor: metrics?.totalPaidCents ?? 0,
+        shareMinor: metrics?.totalOwedCents ?? 0,
+      };
     });
 
-    return totals;
+    return {
+      totalGroupSpendMinor,
+      totalUserPaidMinor,
+      totalUserShareMinor,
+      userNetMinor,
+      memberSnapshots,
+    };
   }, [balance.balances, currentUserId, expenses, members]);
 
   const debtRelations = useMemo(() => {
-    if (balance.transactions.length === 0) {
+    if (balance.transfers.length === 0) {
       return [] as string[];
     }
     const nameMap = new Map<string, string>();
     members.forEach((member) => {
       nameMap.set(member.userId, member.displayName ?? member.email ?? 'Integrante');
     });
-    return balance.transactions.map((tx) => {
-      const from = nameMap.get(tx.from) ?? 'Alguien';
-      const to = nameMap.get(tx.to) ?? 'Alguien';
-      return `${from} debe ${formatCurrency(tx.amount, baseCurrency)} a ${to}`;
+    return balance.transfers.map((tx) => {
+      const from = nameMap.get(tx.fromUserId) ?? 'Alguien';
+      const to = nameMap.get(tx.toUserId) ?? 'Alguien';
+      return `${from} debe ${formatCurrency(tx.amountCents, baseCurrency)} a ${to}`;
     });
-  }, [balance.transactions, members, baseCurrency]);
+  }, [balance.transfers, members, baseCurrency]);
 
   const memberBalances = useMemo(() => {
     const nameMap = new Map<string, string>();
@@ -127,12 +107,12 @@ export function GroupBalanceCard({
       nameMap.set(member.userId, member.displayName ?? member.email ?? 'Integrante');
     });
     return balance.balances.map((entry) => {
-      const tone = entry.net_minor > 0 ? 'text-emerald-200' : entry.net_minor < 0 ? 'text-rose-200' : 'text-slate-200/80';
+      const tone = entry.netBalanceCents > 0 ? 'text-emerald-200' : entry.netBalanceCents < 0 ? 'text-rose-200' : 'text-slate-200/80';
       return {
-        id: entry.user_id,
+        id: entry.userId,
         tone,
-        label: nameMap.get(entry.user_id) ?? 'Integrante',
-        net: entry.net_minor,
+        label: nameMap.get(entry.userId) ?? 'Integrante',
+        net: entry.netBalanceCents,
       };
     });
   }, [balance.balances, members]);

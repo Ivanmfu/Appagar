@@ -1,3 +1,4 @@
+import { computeShares } from '@/lib/finance';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Database } from '@/lib/database.types';
 
@@ -31,6 +32,12 @@ export async function createExpense({
   const supabase = getSupabaseClient();
   const amountBaseMinor = Math.round(totalCents * fxRate);
 
+  const normalizedShares = computeShares({
+    amountCents: totalCents,
+    paidByUserId: payerId,
+    shares,
+  });
+
   const { data: expense, error: createExpenseError } = await supabase
     .from('expenses')
     .insert([
@@ -58,7 +65,7 @@ export async function createExpense({
 
   const expenseData = expense as Expense;
 
-  const rows = shares.map((share) => ({
+  const rows = normalizedShares.map((share) => ({
     expense_id: expenseData.id,
     user_id: share.userId,
     share_minor: share.shareCents,
