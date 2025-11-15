@@ -31,7 +31,12 @@ export async function simplifyGroupDebts(groupId: string) {
   const supabase = getSupabaseClient();
 
   try {
-    const { error } = await supabase.rpc('simplify_group_debts', { group_id: groupId });
+    const rpc = supabase.rpc as unknown as (
+      fn: string,
+      params?: Record<string, unknown>
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+
+    const { error } = await rpc('simplify_group_debts', { group_id: groupId });
     if (error) {
       // Cuando el procedimiento no exista todavía, continuamos con la lógica en memoria.
       console.warn('simplify_group_debts RPC no disponible', error);
