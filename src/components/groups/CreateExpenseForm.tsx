@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from '@/components/AuthGate';
 import { createExpense } from '@/lib/expenses';
 import type { GroupMember } from '@/lib/groups';
 import { splitEvenlyInCents } from '@/lib/money';
@@ -23,6 +24,7 @@ function formatCurrency(minor: number, currency: string) {
 }
 
 export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }: Props) {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
@@ -95,6 +97,10 @@ export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }:
         throw new Error('Introduce un importe');
       }
 
+      if (!user?.id) {
+        throw new Error('Necesitas iniciar sesión para registrar un gasto');
+      }
+
       const parsedAmount = Number.parseFloat(amount.replace(',', '.'));
       if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
         throw new Error('Introduce un importe válido');
@@ -145,6 +151,7 @@ export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }:
         shares,
         note: note.trim() ? note.trim() : undefined,
         date,
+        createdBy: user.id,
       });
     },
     onSuccess: async () => {

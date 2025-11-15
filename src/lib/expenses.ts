@@ -13,6 +13,7 @@ export type CreateExpenseInput = {
   note?: string;
   category?: string;
   date?: string;
+  createdBy: string;
 };
 
 export async function createExpense({
@@ -25,6 +26,7 @@ export async function createExpense({
   note,
   category,
   date,
+  createdBy,
 }: CreateExpenseInput) {
   const supabase = getSupabaseClient();
   const amountBaseMinor = Math.round(totalCents * fxRate);
@@ -42,6 +44,7 @@ export async function createExpense({
         category,
         note,
         date,
+        created_by: createdBy,
       },
     ])
     .select()
