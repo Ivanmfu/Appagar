@@ -219,7 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [supabase]);
 
   // Efecto separado para manejar redirecciones
   useEffect(() => {
