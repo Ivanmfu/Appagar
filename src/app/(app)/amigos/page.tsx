@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/components/AuthGate';
 import { fetchGroupDetail, fetchUserGroups, GroupSummary } from '@/lib/groups';
-import { fetchPendingInvitesForEmail } from '@/lib/invites';
+import { fetchInvitesCreatedBy, SentInvite } from '@/lib/invites';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -24,8 +24,24 @@ function formatDate(input?: string | null) {
   }
 }
 
+function getStatusBadge(status: string) {
+  const normalized = status.toLowerCase();
+  switch (normalized) {
+    case 'accepted':
+      return { label: 'Aceptada', className: 'bg-emerald-400/20 text-emerald-200 border-emerald-300/30' };
+    case 'revoked':
+      return { label: 'Revocada', className: 'bg-slate-500/20 text-slate-200 border-slate-300/20' };
+    case 'expired':
+    case 'caducada':
+      return { label: 'Caducada', className: 'bg-rose-500/15 text-rose-200 border-rose-300/30' };
+    case 'pending':
+    default:
+      return { label: 'Pendiente', className: 'bg-amber-500/20 text-amber-100 border-amber-300/30' };
+  }
+}
+
 export default function FriendsPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
 
   const groupsQuery = useQuery({
     queryKey: ['groups', user?.id],
@@ -36,13 +52,12 @@ export default function FriendsPage() {
     },
   });
 
-  const invitesQuery = useQuery({
-    queryKey: ['invites', profile?.email ?? user?.email],
-    enabled: Boolean(profile?.email ?? user?.email),
+  const sentInvitesQuery = useQuery({
+    queryKey: ['sent-invites', user?.id],
+    enabled: Boolean(user?.id),
     queryFn: async () => {
-      const email = profile?.email ?? user?.email;
-      if (!email) return [];
-      return fetchPendingInvitesForEmail(email);
+      if (!user?.id) return [] as SentInvite[];
+      return fetchInvitesCreatedBy(user.id);
     },
   });
 
@@ -108,28 +123,47 @@ export default function FriendsPage() {
       <section className={`${CARD_CLASS} space-y-4`}>
         <header className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Invitaciones enviadas</h2>
-          <span className="text-xs text-slate-300">{invitesQuery.data?.length ?? 0} en curso</span>
+          <span className="text-xs text-slate-300">{sentInvitesQuery.data?.length ?? 0} registradas</span>
         </header>
 
-        {invitesQuery.isLoading && <p className="text-sm text-slate-300">Buscando invitaciones...</p>}
+        {sentInvitesQuery.isLoading && <p className="text-sm text-slate-300">Buscando invitaciones...</p>}
 
-        {invitesQuery.data && invitesQuery.data.length > 0 ? (
+        {sentInvitesQuery.data && sentInvitesQuery.data.length > 0 ? (
           <ul className="space-y-3 text-sm text-slate-100">
-            {invitesQuery.data.map((invite) => (
-              <li key={invite.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <div>
-                  <p className="font-medium text-white">{invite.email}</p>
-                  <p className="text-xs text-slate-300">Expira {formatDate(invite.expiresAt)}</p>
-                </div>
-                <Link className="text-xs font-semibold text-indigo-200 underline-offset-2 hover:text-white hover:underline" href={`/invite?token=${invite.token}`}>
-                  Detalles
-                </Link>
-              </li>
-            ))}
+            {sentInvitesQuery.data.map((invite) => {
+              const badge = getStatusBadge(invite.status);
+              return (
+                <li
+                  key={invite.id}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/20"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-white">{invite.email}</p>
+                      <p className="text-xs text-slate-300">
+                        Grupo: {invite.groupName ?? 'Sin nombre'} · Enviada {formatDate(invite.createdAt)}
+                      </p>
+                    </div>
+                    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+                    <p>Caduca {formatDate(invite.expiresAt)}</p>
+                    <Link
+                      className="font-semibold text-indigo-200 underline-offset-2 hover:text-white hover:underline"
+                      href={`/invite?token=${invite.token}`}
+                    >
+                      Ver invitación
+                    </Link>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         ) : (
-          !invitesQuery.isLoading && (
-            <p className="text-sm text-slate-200/80">No tienes invitaciones enviadas desde tu correo.</p>
+          !sentInvitesQuery.isLoading && (
+            <p className="text-sm text-slate-200/80">Todavía no has enviado invitaciones desde Appagar.</p>
           )
         )}
       </section>

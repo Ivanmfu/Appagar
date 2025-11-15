@@ -16,6 +16,17 @@ export type PendingInvite = {
   createdAt: Nullable<string>;
 };
 
+export type SentInvite = {
+  id: string;
+  groupId: string;
+  groupName: string | null;
+  email: string;
+  status: string;
+  token: string;
+  expiresAt: Nullable<string>;
+  createdAt: Nullable<string>;
+};
+
 export async function createGroupInvite({
   groupId,
   email,
@@ -95,6 +106,36 @@ export async function fetchPendingInvitesForEmail(email: string): Promise<Pendin
   return (data ?? []).map((row) => ({
     id: row.id,
     groupId: row.group_id,
+    email: row.email,
+    status: row.status,
+    token: row.token,
+    expiresAt: row.expires_at ?? null,
+    createdAt: row.created_at ?? null,
+  }));
+}
+
+export async function fetchInvitesCreatedBy(userId: string): Promise<SentInvite[]> {
+  if (!userId) {
+    return [];
+  }
+
+  const supabase = getSupabaseClient();
+
+  const { data, error } = await supabase
+    .from('group_invites')
+    .select('id, group_id, email, status, token, expires_at, created_at, groups(name)')
+    .eq('created_by', userId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as Array<GroupInviteRow & { groups?: { name?: string | null } | null }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    groupId: row.group_id,
+    groupName: row.groups?.name ?? null,
     email: row.email,
     status: row.status,
     token: row.token,

@@ -17,6 +17,8 @@ export type GroupSummary = {
   createdAt: Nullable<string>;
   memberCount: number;
   lastExpenseAt: Nullable<string>;
+  totalSpendMinor: number;
+  userNetBalanceMinor: number;
 };
 
 export type GroupMember = {
@@ -86,7 +88,12 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     return [];
   }
 
-  const [{ data: groupRows, error: groupsError }, { data: memberRows, error: membersError }, { data: expenseRows, error: expensesError }] = await Promise.all([
+  const [
+    { data: groupRows, error: groupsError },
+    { data: memberRows, error: membersError },
+    { data: expenseRows, error: expensesError },
+    { data: netRows, error: netError },
+  ] = await Promise.all([
     supabase
       .from('groups')
       .select('id, name, base_currency, created_at')
@@ -98,15 +105,19 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
       .eq('is_active', true),
     supabase
       .from('expenses')
-      .select('group_id, date, created_at')
+      .select('group_id, date, created_at, amount_base_minor')
+      .in('group_id', groupIds),
+    supabase
+      .from('group_balance')
+      .select('group_id, net_minor')
       .in('group_id', groupIds)
-      .order('date', { ascending: false })
-      .limit(groupIds.length * 5),
+      .eq('user_id', userId),
   ]);
 
   if (groupsError) throw groupsError;
   if (membersError) throw membersError;
   if (expensesError) throw expensesError;
+  if (netError) throw netError;
 
   const memberCountMap = new Map<string, number>();
   (memberRows ?? []).forEach((row) => {
@@ -114,11 +125,29 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   });
 
   const lastExpenseMap = new Map<string, string | null>();
-  for (const expense of expensesError ? [] : expenseRows ?? []) {
+  const totalSpendMap = new Map<string, number>();
+  for (const expense of expenseRows ?? []) {
     if (!lastExpenseMap.has(expense.group_id)) {
       lastExpenseMap.set(expense.group_id, expense.date ?? expense.created_at ?? null);
     }
+    const currentTotal = totalSpendMap.get(expense.group_id) ?? 0;
+    totalSpendMap.set(expense.group_id, currentTotal + (expense.amount_base_minor ?? 0));
+
+    const previousLast = lastExpenseMap.get(expense.group_id);
+    const candidate = expense.date ?? expense.created_at ?? null;
+    if (candidate) {
+      if (!previousLast) {
+        lastExpenseMap.set(expense.group_id, candidate);
+      } else if (new Date(candidate).getTime() > new Date(previousLast).getTime()) {
+        lastExpenseMap.set(expense.group_id, candidate);
+      }
+    }
   }
+
+  const userNetMap = new Map<string, number>();
+  (netRows ?? []).forEach((row) => {
+    userNetMap.set(row.group_id, row.net_minor ?? 0);
+  });
 
   return (groupRows ?? []).map((group) => ({
     id: group.id,
@@ -127,6 +156,8 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     createdAt: group.created_at,
     memberCount: memberCountMap.get(group.id) ?? 0,
     lastExpenseAt: lastExpenseMap.get(group.id) ?? null,
+    totalSpendMinor: totalSpendMap.get(group.id) ?? 0,
+    userNetBalanceMinor: userNetMap.get(group.id) ?? 0,
   }));
 }
 
@@ -185,7 +216,14 @@ export async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
   const participantRows = (participantRes.data ?? []) as ExpenseParticipantRow[];
   const participantUserIds = participantRows.map((row) => row.user_id);
 
-  const profileIds = Array.from(new Set([...memberUserIds, ...payerIds, ...participantUserIds]));
+  const profileIds = Array.from(
+    new Set([
+      ...memberUserIds,
+      ...payerIds,
+      ...participantUserIds,
+      group.created_by,
+    ].filter((value): value is string => Boolean(value)))
+  );
 
   const profilesRes = profileIds.length
     ? await supabase

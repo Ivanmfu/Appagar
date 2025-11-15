@@ -18,6 +18,19 @@ function formatDate(input?: string | null) {
   }
 }
 
+function formatCurrency(minor: number, currency: string) {
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency,
+  }).format(minor / 100);
+}
+
+function describeBalance(minor: number, currency: string) {
+  if (minor > 0) return `Te deben ${formatCurrency(minor, currency)}`;
+  if (minor < 0) return `Debes ${formatCurrency(Math.abs(minor), currency)}`;
+  return 'Todo en orden ✨';
+}
+
 export default function GroupsPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
@@ -40,6 +53,34 @@ export default function GroupsPage() {
       return fetchUserGroups(user.id);
     },
   });
+
+  const { activeGroups, settledGroups } = useMemo(() => {
+    const all = groupsQuery.data ?? [];
+    const buckets: { activeGroups: GroupSummary[]; settledGroups: GroupSummary[] } = {
+      activeGroups: [],
+      settledGroups: [],
+    };
+
+    all.forEach((group) => {
+      if (group.userNetBalanceMinor === 0) {
+        buckets.settledGroups.push(group);
+      } else {
+        buckets.activeGroups.push(group);
+      }
+    });
+
+    buckets.activeGroups.sort((a, b) => {
+      const aTime = a.lastExpenseAt ? new Date(a.lastExpenseAt).getTime() : 0;
+      const bTime = b.lastExpenseAt ? new Date(b.lastExpenseAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    buckets.settledGroups.sort((a, b) => a.name.localeCompare(b.name));
+
+    return buckets;
+  }, [groupsQuery.data]);
+
+  const hasAnyGroup = (groupsQuery.data?.length ?? 0) > 0;
 
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -138,7 +179,7 @@ export default function GroupsPage() {
       <section className={`${CARD_CLASS} space-y-4`}>
         <header className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Grupos activos</h2>
-          <span className="text-xs text-slate-300">{groupsQuery.data?.length ?? 0} en total</span>
+          <span className="text-xs text-slate-300">{activeGroups.length} en curso</span>
         </header>
 
         {groupsQuery.isLoading && <p className="text-sm text-slate-300">Cargando grupos...</p>}
@@ -148,31 +189,77 @@ export default function GroupsPage() {
           </p>
         )}
 
-        {groupsQuery.data && groupsQuery.data.length > 0 ? (
+        {activeGroups.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
-            {groupsQuery.data.map((group) => (
-              <Link
-                key={group.id}
-                className="group rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-white/30 hover:bg-white/10"
-                href={`/grupos/detalle?id=${group.id}`}
-              >
-                <header className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-white">{group.name}</h3>
-                  <span className="text-xs text-white/70">{group.memberCount} miembros</span>
-                </header>
-                <p className="mt-3 text-xs text-slate-200/70">Creado {formatDate(group.createdAt)}</p>
-                <p className="mt-1 text-xs text-slate-200/70">
-                  Último gasto {formatDate(group.lastExpenseAt)} · Base {group.baseCurrency}
-                </p>
-              </Link>
-            ))}
+            {activeGroups.map((group) => {
+              const balanceCopy = describeBalance(group.userNetBalanceMinor, group.baseCurrency);
+              const balanceTone =
+                group.userNetBalanceMinor > 0
+                  ? 'text-emerald-200'
+                  : 'text-rose-200';
+              return (
+                <Link
+                  key={group.id}
+                  className="group rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-white/30 hover:bg-white/10"
+                  href={`/grupos/detalle?id=${group.id}`}
+                >
+                  <header className="flex items-center justify-between">
+                    <h3 className="text-base font-semibold text-white">{group.name}</h3>
+                    <span className="text-xs text-white/70">{group.memberCount} miembros</span>
+                  </header>
+                  <div className="mt-3 space-y-1 text-xs text-slate-200/70">
+                    <p>Creado {formatDate(group.createdAt)}</p>
+                    <p>Último gasto {formatDate(group.lastExpenseAt)} · Base {group.baseCurrency}</p>
+                    <p>Total del grupo {formatCurrency(group.totalSpendMinor, group.baseCurrency)}</p>
+                    <p className={`font-semibold ${balanceTone}`}>{balanceCopy}</p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           !groupsQuery.isLoading && (
             <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-slate-200/80">
-              Todavía no perteneces a ningún grupo. Crea uno nuevo y comparte el enlace con tus amigos.
+              {hasAnyGroup
+                ? 'Ya no tienes cuentas pendientes en tus grupos activos.'
+                : 'Todavía no perteneces a ningún grupo. Crea uno nuevo y comparte el enlace con tus amigos.'}
             </div>
           )
+        )}
+      </section>
+
+      <section className={`${CARD_CLASS} space-y-4`}>
+        <header className="space-y-1">
+          <h2 className="text-lg font-semibold text-white">Grupos con cuentas saldadas</h2>
+          <p className="text-sm text-slate-200/80">Aquí verás los grupos donde tu saldo neto es cero.</p>
+        </header>
+
+        {groupsQuery.isLoading && <p className="text-sm text-slate-300">Comprobando grupos...</p>}
+
+        {!groupsQuery.isLoading && settledGroups.length === 0 && (
+          <p className="text-sm text-slate-200/70">Aún no tienes grupos totalmente saldados. ¡Sigue equilibrando gastos!</p>
+        )}
+
+        {settledGroups.length > 0 && (
+          <div className="grid gap-4 md:grid-cols-2">
+            {settledGroups.map((group) => (
+              <Link
+                key={group.id}
+                className="rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-white/30 hover:bg-white/10"
+                href={`/grupos/detalle?id=${group.id}`}
+              >
+                <header className="flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-white">{group.name}</h3>
+                  <span className="text-xs text-emerald-200">Todo en orden ✨</span>
+                </header>
+                <div className="mt-3 space-y-1 text-xs text-slate-200/70">
+                  <p>Creado {formatDate(group.createdAt)}</p>
+                  <p>Último movimiento {formatDate(group.lastExpenseAt)} · Base {group.baseCurrency}</p>
+                  <p>Total del grupo {formatCurrency(group.totalSpendMinor, group.baseCurrency)}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </section>
     </div>

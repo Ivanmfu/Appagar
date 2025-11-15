@@ -1,14 +1,14 @@
 'use client';
 
 import { useAuth } from '@/components/AuthGate';
-import { BalanceSummary } from '@/components/groups/BalanceSummary';
-import { CreateExpenseForm } from '@/components/groups/CreateExpenseForm';
+import { GroupBalanceCard } from '@/components/groups/GroupBalanceCard';
 import { ExpenseList } from '@/components/groups/ExpenseList';
 import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
 import { fetchGroupDetail } from '@/lib/groups';
-import { useQuery } from '@tanstack/react-query';
+import { simplifyGroupDebts } from '@/lib/balance';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type DetailPageProps = {
@@ -31,6 +31,7 @@ function formatDate(input?: string | null) {
 export default function GroupDetailPage({ searchParams }: DetailPageProps) {
   const { user } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const rawGroupId = searchParams?.id;
   const [groupId, setGroupId] = useState<string | null>(() => {
     if (!rawGroupId) return null;
@@ -65,6 +66,28 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
     },
     staleTime: 30_000,
   });
+
+  const simplifyMutation = useMutation({
+    mutationFn: async (targetGroupId: string) => simplifyGroupDebts(targetGroupId),
+    onSuccess: async (_data, targetGroupId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['group-detail', targetGroupId] }),
+        queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
+      ]);
+    },
+  });
+
+  const handleSimplify = useCallback(() => {
+    if (!groupId) return;
+    simplifyMutation.mutate(groupId);
+  }, [groupId, simplifyMutation]);
+
+  const creatorDisplayName = useMemo(() => {
+    const detail = detailQuery.data;
+    if (!detail) return null;
+    const owner = detail.members.find((member) => member.userId === detail.group.created_by);
+    return owner?.displayName ?? owner?.email ?? detail.group.created_by;
+  }, [detailQuery.data]);
 
   const pendingInvites = useMemo(() => {
     const invites = detailQuery.data?.invites ?? [];
@@ -116,6 +139,9 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
     );
   }
 
+  const movementCount = detail.expenses.length;
+  const activeMembersCount = detail.members.length;
+
   return (
     <div className="space-y-6">
       <Link className="inline-flex items-center gap-2 text-sm text-indigo-200 underline-offset-2 hover:text-white hover:underline" href="/grupos">
@@ -131,18 +157,41 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
         </header>
         <div className="grid gap-3 text-xs text-slate-200/70 sm:grid-cols-3">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
-            <p className="uppercase tracking-[0.2em] text-slate-300">Propietario</p>
-            <p className="mt-1 text-sm text-white/90">{detail.group.created_by}</p>
+            <p className="uppercase tracking-[0.2em] text-slate-300">Creado por</p>
+            <p className="mt-1 text-sm text-white/90">{creatorDisplayName}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
             <p className="uppercase tracking-[0.2em] text-slate-300">Movimientos</p>
-            <p className="mt-1 text-sm text-white/90">{detail.expenses.length}</p>
+            <p className="mt-1 text-sm text-white/90">{movementCount}</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
-            <p className="uppercase tracking-[0.2em] text-slate-300">Invitaciones</p>
-            <p className="mt-1 text-sm text-white/90">{pendingInvites.length}</p>
+            <p className="uppercase tracking-[0.2em] text-slate-300">Miembros activos</p>
+            <p className="mt-1 text-sm text-white/90">{activeMembersCount}</p>
           </div>
         </div>
+      </section>
+
+      <section className={`${CARD_CLASS}`}>
+        <GroupBalanceCard
+          groupName={detail.group.name}
+          baseCurrency={detail.group.base_currency}
+          expenses={detail.expenses}
+          members={detail.members}
+          balance={detail.balances}
+          currentUserId={user?.id ?? undefined}
+          onSimplify={handleSimplify}
+          simplifyLoading={simplifyMutation.isPending}
+        />
+        {simplifyMutation.error && (
+          <p className="mt-4 text-sm text-red-300">
+            {(simplifyMutation.error as Error).message ?? 'No se pudo simplificar las deudas en este momento.'}
+          </p>
+        )}
+      </section>
+
+      <section className={`${CARD_CLASS} space-y-4`}>
+        <h3 className="text-lg font-semibold text-white">Gastos recientes</h3>
+        <ExpenseList baseCurrency={detail.group.base_currency} expenses={detail.expenses} />
       </section>
 
       <section className={`${CARD_CLASS} space-y-4`}>
@@ -161,33 +210,6 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
             ))}
           </ul>
         )}
-      </section>
-
-      <section className={`${CARD_CLASS} space-y-4`}>
-        <h3 className="text-lg font-semibold text-white">Gastos recientes</h3>
-        <ExpenseList baseCurrency={detail.group.base_currency} expenses={detail.expenses} />
-      </section>
-
-      <section className={`${CARD_CLASS} space-y-4`}>
-        <h3 className="text-lg font-semibold text-white">Registrar gasto</h3>
-        {detail.members.length > 0 && user?.id ? (
-          <CreateExpenseForm
-            baseCurrency={detail.group.base_currency}
-            groupId={detail.group.id}
-            members={detail.members}
-          />
-        ) : (
-          <p className="text-sm text-slate-200/70">Añade miembros antes de registrar nuevos gastos.</p>
-        )}
-      </section>
-
-      <section className={`${CARD_CLASS} space-y-4`}>
-        <h3 className="text-lg font-semibold text-white">Balance del grupo</h3>
-        <BalanceSummary
-          balance={detail.balances}
-          baseCurrency={detail.group.base_currency}
-          members={detail.members}
-        />
       </section>
 
       <section className={`${CARD_CLASS} space-y-6`}>

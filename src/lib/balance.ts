@@ -26,3 +26,20 @@ export async function getGroupBalance(groupId: string) {
 
   return { balances: rows, transactions };
 }
+
+export async function simplifyGroupDebts(groupId: string) {
+  const supabase = getSupabaseClient();
+
+  try {
+    const { error } = await supabase.rpc('simplify_group_debts', { group_id: groupId });
+    if (error) {
+      // Cuando el procedimiento no exista todavía, continuamos con la lógica en memoria.
+      console.warn('simplify_group_debts RPC no disponible', error);
+    }
+  } catch (rpcError) {
+    console.warn('Error al ejecutar simplify_group_debts RPC', rpcError);
+  }
+
+  // Siempre devolvemos un balance recalculado para refrescar la vista.
+  return getGroupBalance(groupId);
+}
