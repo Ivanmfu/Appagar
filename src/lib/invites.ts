@@ -162,7 +162,7 @@ export async function acceptInvite({ token, userId }: { token: string; userId: s
 
   const { data: existingMember, error: memberFetchError } = await supabase
     .from('group_members')
-    .select('id, is_active')
+    .select('group_id, user_id, is_active')
     .eq('group_id', invite.group_id)
     .eq('user_id', userId)
     .maybeSingle();
@@ -183,7 +183,8 @@ export async function acceptInvite({ token, userId }: { token: string; userId: s
     const { error: reactivateError } = await supabase
       .from('group_members')
       .update({ is_active: true })
-      .eq('id', existingMember.id);
+      .eq('group_id', invite.group_id)
+      .eq('user_id', userId);
 
     if (reactivateError) throw reactivateError;
   }
