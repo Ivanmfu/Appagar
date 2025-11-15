@@ -8,7 +8,8 @@ import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
 import { fetchGroupDetail } from '@/lib/groups';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 
 type DetailPageProps = {
   searchParams?: {
@@ -29,11 +30,18 @@ function formatDate(input?: string | null) {
 
 export default function GroupDetailPage({ searchParams }: DetailPageProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const rawGroupId = searchParams?.id;
   const groupId = useMemo(() => {
     if (!rawGroupId) return null;
     return Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
   }, [rawGroupId]);
+
+  useEffect(() => {
+    if (!groupId) {
+      router.replace('/grupos');
+    }
+  }, [groupId, router]);
 
   const detailQuery = useQuery({
     queryKey: ['group-detail', groupId],
@@ -57,10 +65,7 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
   if (!groupId) {
     return (
       <div className={CARD_CLASS}>
-        <p className="text-sm text-red-300">Debes indicar un identificador de grupo válido.</p>
-        <Link className="mt-4 inline-block text-sm text-indigo-200 underline-offset-2 hover:text-white hover:underline" href="/grupos">
-          Volver a grupos
-        </Link>
+        <p className="text-sm text-slate-200/80">Redirigiendo a tus grupos...</p>
       </div>
     );
   }
