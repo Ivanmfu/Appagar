@@ -72,10 +72,25 @@ export type UserTotals = {
   netBalanceCents: number;
 };
 
+type ExpenseRowLite = Pick<
+  Database['public']['Tables']['expenses']['Row'],
+  'id' | 'group_id' | 'payer_id' | 'amount_minor' | 'amount_base_minor'
+>;
+
+type ExpenseParticipantRowLite = Pick<
+  Database['public']['Tables']['expense_participants']['Row'],
+  'expense_id' | 'user_id' | 'share_minor' | 'is_included'
+>;
+
+type GroupMemberRowLite = Pick<
+  Database['public']['Tables']['group_members']['Row'],
+  'user_id' | 'is_active'
+>;
+
 type SeedData = {
-  expenses?: Database['public']['Tables']['expenses']['Row'][];
-  shares?: Database['public']['Tables']['expense_participants']['Row'][];
-  members?: Database['public']['Tables']['group_members']['Row'][];
+  expenses?: ExpenseRowLite[];
+  shares?: ExpenseParticipantRowLite[];
+  members?: GroupMemberRowLite[];
 };
 
 export function summarizeUserTotalsFromData(
@@ -133,10 +148,10 @@ export async function computeUserTotals(groupId: string, seed?: SeedData): Promi
   if (!expenseRows) {
     const { data, error } = await supabase
       .from('expenses')
-      .select('id, group_id, amount_minor, amount_base_minor, payer_id, currency, fx_rate, category, note, date, created_at')
+      .select('id, group_id, amount_minor, amount_base_minor, payer_id')
       .eq('group_id', groupId);
     if (error) throw error;
-    expenseRows = (data ?? []) as Database['public']['Tables']['expenses']['Row'][];
+    expenseRows = (data ?? []) as ExpenseRowLite[];
   }
 
   const expenseRecords: ExpenseRecord[] = (expenseRows ?? []).map((row) => ({
@@ -153,10 +168,10 @@ export async function computeUserTotals(groupId: string, seed?: SeedData): Promi
     if (expenseIds.length > 0) {
       const { data, error } = await supabase
         .from('expense_participants')
-        .select('id, expense_id, user_id, share_minor, is_included')
+        .select('expense_id, user_id, share_minor, is_included')
         .in('expense_id', expenseIds);
       if (error) throw error;
-      shareRows = (data ?? []) as Database['public']['Tables']['expense_participants']['Row'][];
+      shareRows = (data ?? []) as ExpenseParticipantRowLite[];
     } else {
       shareRows = [];
     }
@@ -174,10 +189,10 @@ export async function computeUserTotals(groupId: string, seed?: SeedData): Promi
   if (!memberRows) {
     const { data, error } = await supabase
       .from('group_members')
-      .select('id, group_id, user_id, is_active, role, joined_at')
+      .select('user_id, is_active')
       .eq('group_id', groupId);
     if (error) throw error;
-    memberRows = (data ?? []) as Database['public']['Tables']['group_members']['Row'][];
+    memberRows = (data ?? []) as GroupMemberRowLite[];
   }
 
   const memberIds = (memberRows ?? [])
