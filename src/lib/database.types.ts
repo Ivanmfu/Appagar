@@ -35,18 +35,21 @@ export interface Database {
           id: string
           name: string
           base_currency: string
+          created_by: string
           created_at: string | null
         }
         Insert: {
           id?: string
           name: string
           base_currency?: string
+          created_by: string
           created_at?: string | null
         }
         Update: {
           id?: string
           name?: string
           base_currency?: string
+          created_by?: string
           created_at?: string | null
         }
         Relationships: []
@@ -57,6 +60,7 @@ export interface Database {
           group_id: string
           user_id: string
           is_active: boolean
+          role: string | null
           joined_at: string | null
         }
         Insert: {
@@ -64,6 +68,7 @@ export interface Database {
           group_id: string
           user_id: string
           is_active?: boolean
+          role?: string | null
           joined_at?: string | null
         }
         Update: {
@@ -71,6 +76,7 @@ export interface Database {
           group_id?: string
           user_id?: string
           is_active?: boolean
+          role?: string | null
           joined_at?: string | null
         }
         Relationships: []
@@ -114,6 +120,39 @@ export interface Database {
           note?: string | null
           date?: string | null
           created_at?: string | null
+        }
+        Relationships: []
+      }
+      group_invites: {
+        Row: {
+          id: string
+          group_id: string
+          email: string
+          token: string
+          status: string
+          expires_at: string | null
+          created_at: string | null
+          created_by: string
+        }
+        Insert: {
+          id?: string
+          group_id: string
+          email: string
+          token: string
+          status?: string
+          expires_at?: string | null
+          created_at?: string | null
+          created_by: string
+        }
+        Update: {
+          id?: string
+          group_id?: string
+          email?: string
+          token?: string
+          status?: string
+          expires_at?: string | null
+          created_at?: string | null
+          created_by?: string
         }
         Relationships: []
       }

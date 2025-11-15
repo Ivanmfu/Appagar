@@ -1,30 +1,26 @@
 'use client';
 
 import AuthGate, { useAuth } from '@/components/AuthGate';
-import { getSupabaseClient } from '@/lib/supabase';
+import { BalanceSummary } from '@/components/groups/BalanceSummary';
+import { CreateExpenseForm } from '@/components/groups/CreateExpenseForm';
+import { ExpenseList } from '@/components/groups/ExpenseList';
+import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
+import { createGroup, fetchGroupDetail, fetchUserGroups, GroupSummary } from '@/lib/groups';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useMemo, useState } from 'react';
 
-type Group = {
-  id: string;
-  name: string;
-  created_at: string;
-};
-
-type GroupDetail = Group & {
-  base_currency?: string | null;
-};
-
-type GroupMember = {
-  id: string;
-  email: string | null;
-  display_name: string | null;
-};
+function formatDate(input?: string | null) {
+  if (!input) return '—';
+  try {
+    return new Date(input).toLocaleDateString();
+  } catch {
+    return '—';
+  }
+}
 
 function GroupsContent() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -32,155 +28,48 @@ function GroupsContent() {
   const selectedGroupId = searchParams?.get('selected') ?? null;
   const [creating, setCreating] = useState(showNewGroup);
   const [groupName, setGroupName] = useState('');
-  const supabase = useMemo(() => getSupabaseClient(), []);
 
   const groupsQuery = useQuery({
     queryKey: ['groups', user?.id],
     enabled: Boolean(user?.id),
     queryFn: async () => {
-      if (!user?.id) return [] as Group[];
-      const { data, error } = await supabase
-        .from('group_members')
-        .select('groups(id, name, created_at)')
-        .eq('user_id', user.id)
-        .eq('is_active', true);
-
-      if (error) throw error;
-
-      const rows = (data ?? []) as { groups: Group | null }[];
-      // Extraer los grupos y ordenar localmente por nombre
-      const groups = rows
-        .map((row) => row.groups)
-        .filter((group): group is Group => Boolean(group))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      
-      return groups;
+      if (!user?.id) return [] as GroupSummary[];
+      return fetchUserGroups(user.id);
     },
   });
 
-  const groupDetailQuery = useQuery({
+  const detailQuery = useQuery({
     queryKey: ['group-detail', selectedGroupId],
     enabled: Boolean(user?.id && selectedGroupId),
     queryFn: async () => {
-      if (!user?.id || !selectedGroupId) return null;
-
-      const { data: group, error: groupError } = await supabase
-        .from('groups')
-        .select('id, name, created_at, base_currency')
-        .eq('id', selectedGroupId)
-        .single();
-
-      if (groupError) {
-        throw groupError;
-      }
-
-      const { data: members, error: membersError } = await supabase
-        .from('group_members')
-        .select('profiles(id, email, display_name)')
-        .eq('group_id', selectedGroupId)
-        .eq('is_active', true);
-
-      if (membersError) {
-        throw membersError;
-      }
-
-      const rows = (members ?? []) as { profiles: GroupMember | null }[];
-      const formattedMembers = rows
-        .map((row) => row.profiles)
-        .filter((profile): profile is GroupMember => Boolean(profile));
-
-      return { group: group as GroupDetail, members: formattedMembers };
+      if (!selectedGroupId) throw new Error('Grupo no seleccionado');
+      return fetchGroupDetail(selectedGroupId);
     },
+    staleTime: 30_000,
   });
 
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
-      console.log('[Groups] mutationFn started');
       if (!user?.id) {
-        console.error('[Groups] No user ID');
         throw new Error('Debes iniciar sesión');
       }
-      if (!name.trim()) {
-        console.error('[Groups] Empty name');
-        throw new Error('Introduce un nombre de grupo');
-      }
 
-      console.log('[Groups] Creating group:', name, 'User:', user.id);
-
-      try {
-        const profilePayload = {
-          id: user.id,
-          email: user.email ?? null,
-          display_name:
-            (user.user_metadata as Record<string, unknown>)?.['display_name'] as string | undefined ??
-            (user.user_metadata as Record<string, unknown>)?.['full_name'] as string | undefined ??
-            null,
-        } satisfies { id: string; email: string | null; display_name: string | null };
-
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert(profilePayload)
-          .select('id')
-          .single();
-
-        if (profileError) {
-          console.error('[Groups] Error ensuring profile:', profileError);
-          throw new Error(profileError.message || 'Error al preparar el perfil');
-        }
-
-        // Insertar grupo
-        const { data: group, error: groupError } = await supabase
-          .from('groups')
-          .insert({
-            name: name.trim(),
-            base_currency: 'EUR',
-            created_by: user.id,
-          })
-          .select('id, name, created_at')
-          .single();
-
-        if (groupError) {
-          console.error('[Groups] Error creating group:', groupError);
-          throw new Error(groupError.message || 'Error al crear el grupo');
-        }
-
-        if (!group) {
-          console.error('[Groups] No group returned');
-          throw new Error('No se recibió el grupo creado');
-        }
-
-        console.log('[Groups] Group created:', group.id);
-
-        // Añadir al usuario como miembro
-        const { error: memberError } = await supabase
-          .from('group_members')
-          .insert({
-            group_id: group.id,
-            user_id: user.id,
-            is_active: true,
-          });
-
-        if (memberError) {
-          console.error('[Groups] Error adding member:', memberError);
-          throw new Error(memberError.message || 'Error al añadir miembro');
-        }
-
-        console.log('[Groups] Member added successfully');
-        return group as Group;
-      } catch (error) {
-        console.error('[Groups] Exception:', error);
-        throw error;
-      }
+      return createGroup({
+        name,
+        userId: user.id,
+        email: profile?.email ?? user.email ?? null,
+        displayName:
+          profile?.display_name ??
+          (user.user_metadata as Record<string, unknown>)?.['display_name']?.toString() ??
+          (user.user_metadata as Record<string, unknown>)?.['full_name']?.toString() ??
+          null,
+      });
     },
     onSuccess: async (group) => {
-      console.log('[Groups] Success! Refreshing list...');
       await queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
       setGroupName('');
       setCreating(false);
-      router.replace(`/groups?selected=${group.id}`);
-    },
-    onError: (error) => {
-      console.error('[Groups] Error:', error);
+      router.push(`/groups?selected=${group.id}`);
     },
   });
 
@@ -197,17 +86,25 @@ function GroupsContent() {
     return null;
   }
 
+  const pendingInvites = useMemo(() => {
+    const invites = detailQuery.data?.invites ?? [];
+    return invites.filter((invite) => invite.status === 'pending' && (!invite.expiresAt || new Date(invite.expiresAt) > new Date()));
+  }, [detailQuery.data?.invites]);
+
   return (
     <AuthGate>
       <main className="p-6 space-y-6">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-wrap gap-3 items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Tus grupos</h1>
-            <p className="text-gray-600 text-sm">Crea un grupo nuevo o entra en uno existente.</p>
+            <p className="text-gray-600 text-sm">
+              Crea un grupo o abre uno existente para registrar gastos compartidos.
+            </p>
           </div>
           <button
             className="bg-black text-white px-4 py-2 rounded"
             onClick={() => setCreating(true)}
+            type="button"
           >
             Nuevo grupo
           </button>
@@ -246,89 +143,135 @@ function GroupsContent() {
                 {(createGroupMutation.error as Error).message ?? 'No se pudo crear el grupo'}
               </p>
             )}
-            {createGroupMutation.isSuccess && !createGroupMutation.error && (
-              <p className="text-sm text-green-600">Grupo creado correctamente.</p>
-            )}
           </form>
         )}
 
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold">Grupos existentes</h2>
-          <ul className="space-y-2">
-            {groupsQuery.data?.map((group) => (
-              <li key={group.id} className="border rounded p-3 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{group.name}</p>
-                  <p className="text-xs text-gray-500">
-                    Creado {new Date(group.created_at).toLocaleDateString()}
+        <section className="grid gap-6 lg:grid-cols-[1fr,2fr]">
+          <article className="space-y-3">
+            <h2 className="text-lg font-semibold">Grupos existentes</h2>
+            <ul className="space-y-2">
+              {groupsQuery.data?.map((group) => {
+                const isSelected = group.id === selectedGroupId;
+                return (
+                  <li
+                    key={group.id}
+                    className={`border rounded p-4 flex flex-col gap-2 ${isSelected ? 'border-blue-500 bg-blue-50' : ''}`}
+                  >
+                    <div>
+                      <p className="font-medium text-base">{group.name}</p>
+                      <p className="text-xs text-gray-500">Creado {formatDate(group.createdAt)}</p>
+                      <p className="text-xs text-gray-500">{group.memberCount} miembros · Último gasto {formatDate(group.lastExpenseAt)}</p>
+                    </div>
+                    <button
+                      className="text-sm text-blue-600 hover:underline self-start"
+                      type="button"
+                      onClick={() => router.push(`/groups?selected=${group.id}`)}
+                    >
+                      {isSelected ? 'Viendo detalle' : 'Ver detalle'}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {groupsQuery.isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
+            {groupsQuery.error && (
+              <p className="text-sm text-red-600">
+                {(groupsQuery.error as Error).message ?? 'No se pudieron obtener los grupos'}
+              </p>
+            )}
+            {groupsQuery.data?.length === 0 && !groupsQuery.isLoading && (
+              <p className="text-sm text-gray-500">Todavía no perteneces a ningún grupo.</p>
+            )}
+          </article>
+
+          <article className="space-y-6">
+            {!selectedGroupId && (
+              <div className="border border-dashed rounded-lg p-6 text-sm text-gray-500">
+                Selecciona un grupo para ver sus detalles, gastos e invitaciones.
+              </div>
+            )}
+
+            {selectedGroupId && detailQuery.isLoading && (
+              <p className="text-sm text-gray-500">Cargando detalles del grupo...</p>
+            )}
+
+            {selectedGroupId && detailQuery.error && (
+              <p className="text-sm text-red-600">
+                {(detailQuery.error as Error).message ?? 'No se pudieron obtener los detalles del grupo'}
+              </p>
+            )}
+
+            {selectedGroupId && detailQuery.data && (
+              <>
+                <header className="space-y-1">
+                  <h2 className="text-2xl font-semibold">{detailQuery.data.group.name}</h2>
+                  <p className="text-sm text-gray-500">
+                    Base {detailQuery.data.group.base_currency} · {detailQuery.data.members.length} miembros · Creado {formatDate(detailQuery.data.group.created_at)}
                   </p>
-                </div>
-                <button
-                  className="text-sm text-blue-600 hover:underline"
-                  type="button"
-                  onClick={() => router.replace(`/groups?selected=${group.id}`)}
-                >
-                  {selectedGroupId === group.id ? 'Viendo' : 'Abrir'}
-                </button>
-              </li>
-            ))}
-          </ul>
+                </header>
 
-          {groupsQuery.isLoading && <p className="text-sm text-gray-500">Cargando...</p>}
-          {groupsQuery.error && (
-            <p className="text-sm text-red-600">
-              {(groupsQuery.error as Error).message ?? 'No se pudieron obtener los grupos'}
-            </p>
-          )}
-          {groupsQuery.data?.length === 0 && !groupsQuery.isLoading && (
-            <p className="text-sm text-gray-500">Todavía no perteneces a ningún grupo.</p>
-          )}
-        </section>
+                <section className="border rounded-lg p-4 space-y-4">
+                  <h3 className="text-lg font-semibold">Miembros activos</h3>
+                  {detailQuery.data.members.length === 0 ? (
+                    <p className="text-sm text-gray-500">No hay miembros activos todavía.</p>
+                  ) : (
+                    <ul className="space-y-2 text-sm">
+                      {detailQuery.data.members.map((member) => (
+                        <li key={member.userId} className="border rounded p-3">
+                          <p className="font-medium">{member.displayName ?? member.email ?? 'Miembro'}</p>
+                          {member.email && <p className="text-xs text-gray-500">{member.email}</p>}
+                          {member.role && <p className="text-xs text-gray-400">Rol: {member.role}</p>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
 
-        <section className="space-y-3 border-t pt-6">
-          <h2 className="text-lg font-semibold">Detalle del grupo</h2>
+                <section className="border rounded-lg p-4 space-y-4">
+                  <h3 className="text-lg font-semibold">Gastos recientes</h3>
+                  <ExpenseList expenses={detailQuery.data.expenses} baseCurrency={detailQuery.data.group.base_currency} />
+                </section>
 
-          {!selectedGroupId && (
-            <p className="text-sm text-gray-500">Selecciona un grupo para ver sus detalles.</p>
-          )}
+                <section className="border rounded-lg p-4">
+                  {detailQuery.data.members.length > 0 ? (
+                    <CreateExpenseForm
+                      groupId={selectedGroupId}
+                      members={detailQuery.data.members}
+                      baseCurrency={detailQuery.data.group.base_currency}
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-500">Añade miembros antes de registrar gastos.</p>
+                  )}
+                </section>
 
-          {selectedGroupId && groupDetailQuery.isLoading && (
-            <p className="text-sm text-gray-500">Cargando detalle...</p>
-          )}
+                <section className="border rounded-lg p-4">
+                  <BalanceSummary
+                    balance={detailQuery.data.balances}
+                    members={detailQuery.data.members}
+                    baseCurrency={detailQuery.data.group.base_currency}
+                  />
+                </section>
 
-          {selectedGroupId && groupDetailQuery.error && (
-            <p className="text-sm text-red-600">
-              {(groupDetailQuery.error as Error).message ?? 'No se pudo cargar el detalle del grupo'}
-            </p>
-          )}
-
-          {selectedGroupId && groupDetailQuery.data?.group && (
-            <div className="space-y-4">
-              <div>
-                <p className="text-xl font-semibold">{groupDetailQuery.data.group.name}</p>
-                <p className="text-sm text-gray-500">
-                  Creado el {new Date(groupDetailQuery.data.group.created_at).toLocaleDateString()} · Moneda base:{' '}
-                  {groupDetailQuery.data.group.base_currency ?? '—'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="text-base font-semibold">Miembros activos</h3>
-                {groupDetailQuery.data.members.length === 0 ? (
-                  <p className="text-sm text-gray-500">Todavía no hay miembros en este grupo.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {groupDetailQuery.data.members.map((member) => (
-                      <li key={member.id} className="border rounded p-3">
-                        <p className="font-medium">{member.display_name ?? member.email ?? 'Miembro'}</p>
-                        {member.email && <p className="text-xs text-gray-500">{member.email}</p>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          )}
+                <section className="border rounded-lg p-4 space-y-4">
+                  <InviteMemberForm groupId={selectedGroupId} createdBy={user.id} />
+                  {pendingInvites.length > 0 && (
+                    <div className="space-y-2 text-sm">
+                      <h3 className="font-semibold">Invitaciones pendientes</h3>
+                      <ul className="space-y-2">
+                        {pendingInvites.map((invite) => (
+                          <li key={invite.id} className="border rounded p-3">
+                            <p>{invite.email}</p>
+                            <p className="text-xs text-gray-500">Expira {formatDate(invite.expiresAt)}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
+          </article>
         </section>
       </main>
     </AuthGate>
