@@ -73,6 +73,26 @@ function GroupsContent() {
       console.log('[Groups] Creating group:', name, 'User:', user.id);
 
       try {
+        const profilePayload = {
+          id: user.id,
+          email: user.email ?? null,
+          display_name:
+            (user.user_metadata as Record<string, unknown>)?.['display_name'] as string | undefined ??
+            (user.user_metadata as Record<string, unknown>)?.['full_name'] as string | undefined ??
+            null,
+        } satisfies { id: string; email: string | null; display_name: string | null };
+
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert(profilePayload)
+          .select('id')
+          .single();
+
+        if (profileError) {
+          console.error('[Groups] Error ensuring profile:', profileError);
+          throw new Error(profileError.message || 'Error al preparar el perfil');
+        }
+
         // Insertar grupo
         const { data: group, error: groupError } = await supabase
           .from('groups')
