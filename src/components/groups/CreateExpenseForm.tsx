@@ -28,12 +28,6 @@ export function CreateExpenseForm({ groupId, members, baseCurrency }: Props) {
   const [participantIds, setParticipantIds] = useState<string[]>(() => members.map((m) => m.userId));
   const [error, setError] = useState<string | null>(null);
 
-  const memberMap = useMemo(() => {
-    const map = new Map<string, GroupMember>();
-    members.forEach((member) => map.set(member.userId, member));
-    return map;
-  }, [members]);
-
   useEffect(() => {
     if (members.length === 0) return;
 

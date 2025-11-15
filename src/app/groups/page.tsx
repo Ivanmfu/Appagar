@@ -48,6 +48,11 @@ function GroupsContent() {
     staleTime: 30_000,
   });
 
+  const pendingInvites = useMemo(() => {
+    const invites = detailQuery.data?.invites ?? [];
+    return invites.filter((invite) => invite.status === 'pending' && (!invite.expiresAt || new Date(invite.expiresAt) > new Date()));
+  }, [detailQuery.data?.invites]);
+
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
       if (!user?.id) {
@@ -85,11 +90,6 @@ function GroupsContent() {
   if (!user) {
     return null;
   }
-
-  const pendingInvites = useMemo(() => {
-    const invites = detailQuery.data?.invites ?? [];
-    return invites.filter((invite) => invite.status === 'pending' && (!invite.expiresAt || new Date(invite.expiresAt) > new Date()));
-  }, [detailQuery.data?.invites]);
 
   return (
     <AuthGate>

@@ -60,9 +60,9 @@ export default function LoginPage() {
         if (authError) throw authError;
         router.push('/');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      setError(error.message || 'Error al procesar la solicitud');
+      setError(error instanceof Error ? error.message : 'Error al procesar la solicitud');
     } finally {
       setLoading(false);
     }
@@ -87,9 +87,9 @@ export default function LoginPage() {
 
       if (authError) throw authError;
       setSent(true);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      setError(error.message || 'Error al enviar el enlace');
+      setError(error instanceof Error ? error.message : 'Error al enviar enlace');
     } finally {
       setLoading(false);
     }
@@ -108,9 +108,9 @@ export default function LoginPage() {
       });
 
       if (authError) throw authError;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      setError(error.message || 'Error al iniciar sesión con Google');
+      setError(error instanceof Error ? error.message : 'Error al iniciar sesión con Google');
       setLoading(false);
     }
   }

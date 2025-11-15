@@ -7,7 +7,6 @@ type GroupMemberRow = Database['public']['Tables']['group_members']['Row'];
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 type ExpenseRow = Database['public']['Tables']['expenses']['Row'];
 type ExpenseParticipantRow = Database['public']['Tables']['expense_participants']['Row'];
-type GroupInviteRow = Database['public']['Tables']['group_invites']['Row'];
 
 type Nullable<T> = T | null;
 
