@@ -8,7 +8,7 @@ import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
 import { fetchGroupDetail } from '@/lib/groups';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type DetailPageProps = {
@@ -32,15 +32,28 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
   const { user } = useAuth();
   const router = useRouter();
   const rawGroupId = searchParams?.id;
-  const groupId = useMemo(() => {
+  const [groupId, setGroupId] = useState<string | null>(() => {
     if (!rawGroupId) return null;
     return Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
+  });
+
+  useEffect(() => {
+    if (!rawGroupId) return;
+    const resolvedId = Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
+    setGroupId(resolvedId);
   }, [rawGroupId]);
 
   useEffect(() => {
-    if (!groupId) {
-      router.replace('/grupos');
+    if (groupId) return;
+    if (typeof window === 'undefined') return;
+
+    const urlGroupId = new URLSearchParams(window.location.search).get('id');
+    if (urlGroupId) {
+      setGroupId(urlGroupId);
+      return;
     }
+
+    router.replace('/grupos');
   }, [groupId, router]);
 
   const detailQuery = useQuery({
