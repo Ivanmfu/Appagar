@@ -137,12 +137,12 @@ function GroupsContent() {
         throw error;
       }
     },
-    onSuccess: async (group) => {
+    onSuccess: async () => {
       console.log('[Groups] Success! Refreshing list...');
       await queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
       setGroupName('');
       setCreating(false);
-      router.push(`/groups/${group.id}`);
+      router.replace('/groups');
     },
     onError: (error) => {
       console.error('[Groups] Error:', error);
