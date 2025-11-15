@@ -25,7 +25,27 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
       const maybeData = (window as typeof window & {
         __NEXT_DATA__?: { config?: { basePath?: string } };
       }).__NEXT_DATA__;
-      return maybeData?.config?.basePath ?? '';
+      if (maybeData?.config?.basePath) {
+        return maybeData.config.basePath;
+      }
+
+      const knownRoutes = new Set([
+        '',
+        'amigos',
+        'grupos',
+        'actividad',
+        'cuenta',
+        'invite',
+        'login',
+      ]);
+
+      const segments = window.location.pathname.split('/').filter(Boolean);
+      if (segments.length > 0) {
+        const candidate = segments[0];
+        if (!knownRoutes.has(candidate)) {
+          return `/${candidate}`;
+        }
+      }
     }
 
     return '';
