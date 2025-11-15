@@ -50,7 +50,7 @@ export default function DashboardPage() {
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-white">Bienvenido/a de nuevo</h2>
           <p className="text-sm text-slate-200/80">
-            Accede rápido a tus grupos activos, revisa invitaciones pendientes o crea un nuevo espacio para coordinar gastos.
+            Accede rápido a tus grupos activos, revisa invitaciones pendientes o registra un nuevo gasto sin perder detalle.
           </p>
           <div className="flex flex-wrap gap-3">
             <Link
@@ -121,7 +121,7 @@ export default function DashboardPage() {
         ) : (
           !groupsQuery.isLoading && (
             <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-slate-200/70">
-              Aún no perteneces a ningún grupo. Usa el botón flotante para crear uno al instante.
+              Aún no perteneces a ningún grupo. Usa el botón flotante para registrar tu primer gasto una vez que formes uno.
             </div>
           )
         )}
