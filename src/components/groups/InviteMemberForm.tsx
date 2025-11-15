@@ -15,13 +15,33 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  function resolveBasePath() {
+    const fromEnv = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+    if (fromEnv) {
+      return fromEnv;
+    }
+
+    if (typeof window !== 'undefined') {
+      const maybeData = (window as typeof window & {
+        __NEXT_DATA__?: { config?: { basePath?: string } };
+      }).__NEXT_DATA__;
+      return maybeData?.config?.basePath ?? '';
+    }
+
+    return '';
+  }
+
   const mutation = useMutation({
     mutationFn: async () => {
       setError(null);
       const invite = await createGroupInvite({ groupId, email, createdBy });
       const origin = typeof window === 'undefined' ? '' : window.location.origin;
-      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-      const normalizedBasePath = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+      const basePath = resolveBasePath();
+      const normalizedBasePath = basePath
+        ? basePath.endsWith('/')
+          ? basePath.slice(0, -1)
+          : basePath
+        : '';
       const link = `${origin}${normalizedBasePath}/invite?token=${invite.token}`;
       setInviteLink(link);
       return invite;
