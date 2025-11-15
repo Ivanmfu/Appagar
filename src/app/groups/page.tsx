@@ -79,6 +79,7 @@ function GroupsContent() {
           .insert({
             name: name.trim(),
             base_currency: 'EUR',
+            created_by: user.id,
           })
           .select('id, name, created_at')
           .single();
