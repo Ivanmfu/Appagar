@@ -20,7 +20,9 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
       setError(null);
       const invite = await createGroupInvite({ groupId, email, createdBy });
       const origin = typeof window === 'undefined' ? '' : window.location.origin;
-      const link = `${origin}/invite?token=${invite.token}`;
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+      const normalizedBasePath = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+      const link = `${origin}${normalizedBasePath}/invite?token=${invite.token}`;
       setInviteLink(link);
       return invite;
     },
