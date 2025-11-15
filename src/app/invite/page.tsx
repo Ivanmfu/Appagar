@@ -57,7 +57,7 @@ function InviteContent() {
     },
     onSuccess: (groupId) => {
       queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
-      router.push(`/groups?selected=${groupId}`);
+      router.push(`/grupos/detalle?id=${groupId}`);
     },
   });
 
@@ -121,7 +121,7 @@ function InviteContent() {
         <main className="p-6 space-y-4">
           <h1 className="text-2xl font-semibold">Invitación no disponible</h1>
           <p className="text-sm text-gray-600">Esta invitación ya no se puede utilizar.</p>
-          <Link className="text-sm text-blue-600 hover:underline" href={`/groups?selected=${invite.group_id}`}>
+          <Link className="text-sm text-blue-600 hover:underline" href={`/grupos/detalle?id=${invite.group_id}`}>
             Ir al grupo
           </Link>
         </main>
