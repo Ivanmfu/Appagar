@@ -4,7 +4,7 @@ import AuthGate, { useAuth } from '@/components/AuthGate';
 import { AddExpenseFlow } from '@/components/groups/AddExpenseFlow';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { ReactNode, useMemo, useState, useCallback } from 'react';
+import { ReactNode, Suspense, useCallback, useMemo, useState } from 'react';
 
 const navItems = [
   { href: '/', label: 'Inicio' },
@@ -16,11 +16,7 @@ const navItems = [
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { profile, user } = useAuth();
-
-  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
-  const [addExpenseGroupId, setAddExpenseGroupId] = useState<string | undefined>(undefined);
 
   const activeHref = useMemo(() => {
     if (!pathname) return '/';
@@ -28,26 +24,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
     const match = navItems.find((item) => item.href !== '/' && pathname.startsWith(item.href));
     return match?.href ?? '/';
   }, [pathname]);
-
-  const currentGroupId = useMemo(() => {
-    if (!pathname) return undefined;
-    if (!pathname.startsWith('/grupos/detalle')) return undefined;
-    return searchParams?.get('id') ?? undefined;
-  }, [pathname, searchParams]);
-
-  const openAddExpense = useCallback(() => {
-    if (pathname?.startsWith('/grupos/detalle') && currentGroupId) {
-      setAddExpenseGroupId(currentGroupId);
-    } else {
-      setAddExpenseGroupId(undefined);
-    }
-    setAddExpenseOpen(true);
-  }, [pathname, currentGroupId]);
-
-  const closeAddExpense = useCallback(() => {
-    setAddExpenseOpen(false);
-    setAddExpenseGroupId(undefined);
-  }, []);
 
   return (
     <AuthGate>
@@ -107,22 +83,51 @@ export default function AppShell({ children }: { children: ReactNode }) {
             })}
           </ul>
         </nav>
-
-        <button
-          aria-label="Registrar nuevo gasto"
-          className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-3xl font-semibold text-white shadow-2xl shadow-purple-500/30 transition hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:right-10"
-          onClick={openAddExpense}
-          type="button"
-        >
-          +
-        </button>
-
-        <AddExpenseFlow
-          currentGroupId={addExpenseGroupId}
-          isOpen={addExpenseOpen}
-          onClose={closeAddExpense}
-        />
+        <Suspense fallback={null}>
+          <FloatingAddExpenseTrigger />
+        </Suspense>
       </div>
     </AuthGate>
+  );
+}
+
+function FloatingAddExpenseTrigger() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [addExpenseGroupId, setAddExpenseGroupId] = useState<string | undefined>(undefined);
+
+  const openAddExpense = useCallback(() => {
+    const groupId = searchParams?.get('id') ?? undefined;
+    if (pathname?.startsWith('/grupos/detalle') && groupId) {
+      setAddExpenseGroupId(groupId);
+    } else {
+      setAddExpenseGroupId(undefined);
+    }
+    setAddExpenseOpen(true);
+  }, [pathname, searchParams]);
+
+  const closeAddExpense = useCallback(() => {
+    setAddExpenseOpen(false);
+    setAddExpenseGroupId(undefined);
+  }, []);
+
+  return (
+    <>
+      <button
+        aria-label="Registrar nuevo gasto"
+        className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-3xl font-semibold text-white shadow-2xl shadow-purple-500/30 transition hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white md:right-10"
+        onClick={openAddExpense}
+        type="button"
+      >
+        +
+      </button>
+
+      <AddExpenseFlow
+        currentGroupId={addExpenseGroupId}
+        isOpen={addExpenseOpen}
+        onClose={closeAddExpense}
+      />
+    </>
   );
 }
