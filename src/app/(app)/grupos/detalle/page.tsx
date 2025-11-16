@@ -1,7 +1,10 @@
-export const dynamic = 'force-dynamic';
+import { Suspense } from 'react';
+import GroupDetailPageClient from './GroupDetailPageClient';
 
-import GroupDetailPageClient, { DetailPageProps } from './GroupDetailPageClient';
-
-export default function GroupDetailPage(props: DetailPageProps) {
-  return <GroupDetailPageClient {...props} />;
+export default function GroupDetailPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-white/80">Cargando...</div>}>
+      <GroupDetailPageClient />
+    </Suspense>
+  );
 }

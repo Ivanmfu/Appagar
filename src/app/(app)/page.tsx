@@ -1,5 +1,3 @@
-export const dynamic = 'force-dynamic';
-
 import DashboardPageClient from './DashboardPageClient';
 
 export default function DashboardPage() {

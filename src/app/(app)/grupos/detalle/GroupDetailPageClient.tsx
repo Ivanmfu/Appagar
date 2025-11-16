@@ -11,14 +11,8 @@ import { settleGroupDebt } from '@/lib/settlements';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import type { GroupExpense } from '@/lib/groups';
-
-export type DetailPageProps = {
-  searchParams?: {
-    id?: string | string[];
-  };
-};
 
 const CARD_CLASS = 'rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-xl shadow-xl shadow-black/20';
 
@@ -46,38 +40,25 @@ type SettlementPrompt = {
   toName: string;
 };
 
-export default function GroupDetailPageClient({ searchParams }: DetailPageProps) {
+export default function GroupDetailPageClient() {
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const rawGroupId = searchParams?.id;
-  const [groupId, setGroupId] = useState<string | null>(() => {
-    if (!rawGroupId) return null;
-    return Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
-  });
+  const [groupId, setGroupId] = useState<string | null>(null);
   const [expenseToEdit, setExpenseToEdit] = useState<GroupExpense | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingSettlement, setPendingSettlement] = useState<SettlementPrompt | null>(null);
 
   useEffect(() => {
-    if (!rawGroupId) return;
-    const resolvedId = Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
-    setGroupId(resolvedId);
-  }, [rawGroupId]);
-
-  useEffect(() => {
-    if (groupId) return;
-    if (typeof window === 'undefined') return;
-
-    const urlGroupId = new URLSearchParams(window.location.search).get('id');
-    if (urlGroupId) {
-      setGroupId(urlGroupId);
-      return;
+    const id = searchParams?.get('id');
+    if (id) {
+      setGroupId(id);
+    } else {
+      router.replace('/grupos');
     }
-
-    router.replace('/grupos');
-  }, [groupId, router]);
+  }, [searchParams, router]);
 
   const detailQuery = useQuery({
     queryKey: ['group-detail', groupId],
