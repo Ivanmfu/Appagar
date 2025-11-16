@@ -70,6 +70,20 @@ export type GroupDetail = {
   balances: Awaited<ReturnType<typeof getGroupBalance>>;
 };
 
+export type UserDebtRelation = {
+  groupId: string;
+  groupName: string;
+  baseCurrency: string;
+  fromUserId: string;
+  fromName: string;
+  toUserId: string;
+  toName: string;
+  counterpartyId: string;
+  counterpartyName: string;
+  amountCents: number;
+  direction: 'incoming' | 'outgoing';
+};
+
 export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   const supabase = getSupabaseClient();
 
@@ -387,6 +401,99 @@ export async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
     invites,
     balances,
   } satisfies GroupDetail;
+}
+
+export async function fetchUserDebtRelations(userId: string): Promise<UserDebtRelation[]> {
+  if (!userId) return [];
+
+  const supabase = getSupabaseClient();
+  const groupSummaries = await fetchUserGroups(userId);
+
+  if (groupSummaries.length === 0) {
+    return [];
+  }
+
+  const metaByGroup = new Map(groupSummaries.map((summary) => [summary.id, summary] as const));
+
+  const balanceResults = await Promise.all(
+    groupSummaries.map(async (summary) => ({
+      groupId: summary.id,
+      balance: await getGroupBalance(summary.id),
+    })),
+  );
+
+  const profileIds = new Set<string>();
+  const rawRelations: Array<{
+    groupId: string;
+    fromUserId: string;
+    toUserId: string;
+    amountCents: number;
+  }> = [];
+
+  balanceResults.forEach(({ groupId, balance }) => {
+    balance.transfers.forEach((transfer) => {
+      if (transfer.fromUserId !== userId && transfer.toUserId !== userId) {
+        return;
+      }
+      rawRelations.push({
+        groupId,
+        fromUserId: transfer.fromUserId,
+        toUserId: transfer.toUserId,
+        amountCents: transfer.amountCents,
+      });
+      profileIds.add(transfer.fromUserId);
+      profileIds.add(transfer.toUserId);
+    });
+  });
+
+  if (rawRelations.length === 0) {
+    return [];
+  }
+
+  const profileRes = profileIds.size
+    ? await supabase
+        .from('profiles')
+        .select('id, display_name, email')
+        .in('id', Array.from(profileIds))
+    : { data: [] as ProfileRow[], error: null };
+
+  if (profileRes.error) {
+    throw profileRes.error;
+  }
+
+  const profileMap = new Map<string, ProfileRow>();
+  (profileRes.data ?? []).forEach((profile) => {
+    profileMap.set(profile.id, profile as ProfileRow);
+  });
+
+  const fallbackName = (profile: ProfileRow | undefined) => profile?.display_name ?? profile?.email ?? 'Integrante';
+
+  return rawRelations.map((relation) => {
+    const summary = metaByGroup.get(relation.groupId);
+
+    const fromProfile = profileMap.get(relation.fromUserId);
+    const toProfile = profileMap.get(relation.toUserId);
+    const fromName = fallbackName(fromProfile);
+    const toName = fallbackName(toProfile);
+
+    const direction = relation.fromUserId === userId ? 'outgoing' : 'incoming';
+    const counterpartyId = direction === 'outgoing' ? relation.toUserId : relation.fromUserId;
+    const counterpartyName = direction === 'outgoing' ? toName : fromName;
+
+    return {
+      groupId: relation.groupId,
+      groupName: summary?.name ?? 'Grupo desconocido',
+      baseCurrency: summary?.baseCurrency ?? 'EUR',
+      fromUserId: relation.fromUserId,
+      fromName,
+      toUserId: relation.toUserId,
+      toName,
+      counterpartyId,
+      counterpartyName,
+      amountCents: relation.amountCents,
+      direction,
+    } satisfies UserDebtRelation;
+  });
 }
 
 export type CreateGroupInput = {
