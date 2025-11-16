@@ -150,6 +150,20 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   }
 
   const perGroupUserTotals = new Map<string, Map<string, { paid: number; owed: number }>>();
+  const perGroupSettlements = new Map<string, Map<string, { paid: number; received: number }>>();
+
+  const ensureSettlementEntry = (groupId: string, memberId: string | null) => {
+    if (!memberId) return null;
+    if (!perGroupSettlements.has(groupId)) {
+      perGroupSettlements.set(groupId, new Map());
+    }
+    const groupMap = perGroupSettlements.get(groupId)!;
+    if (!groupMap.has(memberId)) {
+      groupMap.set(memberId, { paid: 0, received: 0 });
+    }
+    return groupMap.get(memberId)!;
+  };
+
   const ensureUserEntry = (groupId: string, memberId: string | null) => {
     if (!memberId) return null;
     if (!perGroupUserTotals.has(groupId)) {
@@ -159,6 +173,7 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     if (!groupMap.has(memberId)) {
       groupMap.set(memberId, { paid: 0, owed: 0 });
     }
+    ensureSettlementEntry(groupId, memberId);
     return groupMap.get(memberId)!;
   };
 
@@ -187,11 +202,35 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     }
   });
 
+  const { data: settlementRows, error: settlementError } = groupIds.length
+    ? await supabase
+        .from('settlements')
+        .select('group_id, from_user_id, to_user_id, amount_minor')
+        .in('group_id', groupIds)
+    : { data: [] as { group_id: string | null; from_user_id: string; to_user_id: string; amount_minor: number }[], error: null };
+
+  if (settlementError) throw settlementError;
+
+  (settlementRows ?? []).forEach((settlement) => {
+    if (!settlement.group_id) return;
+    const amount = settlement.amount_minor ?? 0;
+    if (amount <= 0) return;
+    const payerEntry = ensureSettlementEntry(settlement.group_id, settlement.from_user_id);
+    if (payerEntry) {
+      payerEntry.paid += amount;
+    }
+    const receiverEntry = ensureSettlementEntry(settlement.group_id, settlement.to_user_id);
+    if (receiverEntry) {
+      receiverEntry.received += amount;
+    }
+  });
+
   const userNetMap = new Map<string, number>();
   perGroupUserTotals.forEach((userTotals, groupId) => {
     const stats = userTotals.get(userId ?? '');
     if (stats) {
-      userNetMap.set(groupId, stats.paid - stats.owed);
+      const settlementStats = perGroupSettlements.get(groupId)?.get(userId ?? '') ?? { paid: 0, received: 0 };
+      userNetMap.set(groupId, stats.paid - stats.owed + settlementStats.paid - settlementStats.received);
     }
   });
 

@@ -25,6 +25,14 @@ type GroupBalanceCardProps = {
   currentUserId?: string;
   onSimplify: () => Promise<void> | void;
   simplifyLoading?: boolean;
+  onSettleRequest?: (payload: {
+    fromUserId: string;
+    toUserId: string;
+    amountCents: number;
+    fromName: string;
+    toName: string;
+  }) => void;
+  settlementLoading?: boolean;
 };
 
 export function GroupBalanceCard({
@@ -36,6 +44,8 @@ export function GroupBalanceCard({
   currentUserId,
   onSimplify,
   simplifyLoading = false,
+  onSettleRequest,
+  settlementLoading = false,
 }: GroupBalanceCardProps) {
   const [totalsOpen, setTotalsOpen] = useState(false);
 
@@ -88,18 +98,26 @@ export function GroupBalanceCard({
 
   const debtRelations = useMemo(() => {
     if (balance.transfers.length === 0) {
-      return [] as string[];
+      return [] as Array<{
+        fromUserId: string;
+        toUserId: string;
+        amountCents: number;
+        fromName: string;
+        toName: string;
+      }>;
     }
     const nameMap = new Map<string, string>();
     members.forEach((member) => {
       nameMap.set(member.userId, member.displayName ?? member.email ?? 'Integrante');
     });
-    return balance.transfers.map((tx) => {
-      const from = nameMap.get(tx.fromUserId) ?? 'Alguien';
-      const to = nameMap.get(tx.toUserId) ?? 'Alguien';
-      return `${from} debe ${formatCurrency(tx.amountCents, baseCurrency)} a ${to}`;
-    });
-  }, [balance.transfers, members, baseCurrency]);
+    return balance.transfers.map((tx) => ({
+      fromUserId: tx.fromUserId,
+      toUserId: tx.toUserId,
+      amountCents: tx.amountCents,
+      fromName: nameMap.get(tx.fromUserId) ?? 'Alguien',
+      toName: nameMap.get(tx.toUserId) ?? 'Alguien',
+    }));
+  }, [balance.transfers, members]);
 
   const memberBalances = useMemo(() => {
     const nameMap = new Map<string, string>();
@@ -173,11 +191,36 @@ export function GroupBalanceCard({
         <h4 className="text-sm font-semibold text-white">Relaciones de deuda</h4>
         {debtRelations.length > 0 ? (
           <ul className="space-y-2 text-sm text-slate-200/80">
-            {debtRelations.map((relation, index) => (
-              <li key={`${relation}-${index}`} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                {relation}
-              </li>
-            ))}
+            {debtRelations.map((relation) => {
+              const relationLabel = `${relation.fromName} debe ${formatCurrency(relation.amountCents, baseCurrency)} a ${relation.toName}`;
+              const userInvolved = currentUserId && (currentUserId === relation.fromUserId || currentUserId === relation.toUserId);
+              return (
+                <li
+                  key={`${relation.fromUserId}-${relation.toUserId}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                >
+                  <span>{relationLabel}</span>
+                  {userInvolved && onSettleRequest && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onSettleRequest?.({
+                          fromUserId: relation.fromUserId,
+                          toUserId: relation.toUserId,
+                          amountCents: relation.amountCents,
+                          fromName: relation.fromName,
+                          toName: relation.toName,
+                        })
+                      }
+                      disabled={settlementLoading}
+                      className="rounded-full border border-white/20 px-4 py-1 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Liquidar
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="text-sm text-emerald-200/80">En este grupo, todo está en orden ✨</p>

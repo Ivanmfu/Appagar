@@ -69,6 +69,8 @@ export type UserTotals = {
   userId: string;
   totalPaidCents: number;
   totalOwedCents: number;
+  settlementsPaidCents: number;
+  settlementsReceivedCents: number;
   netBalanceCents: number;
 };
 
@@ -87,16 +89,23 @@ type GroupMemberRowLite = Pick<
   'user_id' | 'is_active'
 >;
 
+type SettlementRowLite = Pick<
+  Database['public']['Tables']['settlements']['Row'],
+  'group_id' | 'from_user_id' | 'to_user_id' | 'amount_minor'
+>;
+
 type SeedData = {
   expenses?: ExpenseRowLite[];
   shares?: ExpenseParticipantRowLite[];
   members?: GroupMemberRowLite[];
+  settlements?: SettlementRowLite[];
 };
 
 export function summarizeUserTotalsFromData(
   expenses: ExpenseRecord[],
   shares: ExpenseShareRecord[],
-  memberIds: string[] = []
+  memberIds: string[] = [],
+  settlements: SettlementRowLite[] = []
 ): UserTotals[] {
   const totals = new Map<string, { paid: number; owed: number }>();
   const ensureEntry = (userId: string) => {
@@ -106,9 +115,18 @@ export function summarizeUserTotalsFromData(
     return totals.get(userId)!;
   };
 
+  const settlementTotals = new Map<string, { paid: number; received: number }>();
+  const ensureSettlementEntry = (userId: string) => {
+    if (!settlementTotals.has(userId)) {
+      settlementTotals.set(userId, { paid: 0, received: 0 });
+    }
+    return settlementTotals.get(userId)!;
+  };
+
   memberIds.forEach((memberId) => {
     if (memberId) {
       ensureEntry(memberId);
+      ensureSettlementEntry(memberId);
     }
   });
 
@@ -129,13 +147,37 @@ export function summarizeUserTotalsFromData(
     entry.owed += share.shareCents;
   });
 
+  settlements.forEach((settlement) => {
+    if (!settlement) return;
+    const amount = settlement.amount_minor ?? 0;
+    if (amount <= 0) return;
+    const fromUserId = settlement.from_user_id;
+    const toUserId = settlement.to_user_id;
+    if (fromUserId) {
+      ensureEntry(fromUserId);
+      const record = ensureSettlementEntry(fromUserId);
+      record.paid += amount;
+    }
+    if (toUserId) {
+      ensureEntry(toUserId);
+      const record = ensureSettlementEntry(toUserId);
+      record.received += amount;
+    }
+  });
+
   return Array.from(totals.entries())
-    .map(([userId, { paid, owed }]) => ({
-      userId,
-      totalPaidCents: paid,
-      totalOwedCents: owed,
-      netBalanceCents: paid - owed,
-    }))
+    .map(([userId, { paid, owed }]) => {
+      const settlement = settlementTotals.get(userId) ?? { paid: 0, received: 0 };
+      const netBalanceCents = paid - owed + settlement.paid - settlement.received;
+      return {
+        userId,
+        totalPaidCents: paid,
+        totalOwedCents: owed,
+        settlementsPaidCents: settlement.paid,
+        settlementsReceivedCents: settlement.received,
+        netBalanceCents,
+      } satisfies UserTotals;
+    })
     .sort((a, b) => a.userId.localeCompare(b.userId));
 }
 
@@ -200,7 +242,17 @@ export async function computeUserTotals(groupId: string, seed?: SeedData): Promi
     .map((row) => row.user_id)
     .filter((id): id is string => Boolean(id));
 
-  return summarizeUserTotalsFromData(expenseRecords, shareRecords, memberIds);
+  let settlementRows = seed?.settlements;
+  if (!settlementRows) {
+    const { data, error } = await supabase
+      .from('settlements')
+      .select('group_id, from_user_id, to_user_id, amount_minor')
+      .eq('group_id', groupId);
+    if (error) throw error;
+    settlementRows = (data ?? []) as SettlementRowLite[];
+  }
+
+  return summarizeUserTotalsFromData(expenseRecords, shareRecords, memberIds, settlementRows);
 }
 
 export async function computeNetBalances(groupId: string, seed?: SeedData): Promise<UserBalance[]> {
@@ -318,7 +370,12 @@ function runFinanceAssertions() {
   ];
 
   scenarios.forEach((scenario) => {
-    const totals = summarizeUserTotalsFromData(scenario.expenses, scenario.shares, Object.keys(scenario.expectedNet));
+    const totals = summarizeUserTotalsFromData(
+      scenario.expenses,
+      scenario.shares,
+      Object.keys(scenario.expectedNet),
+      []
+    );
 
     Object.entries(scenario.expectedNet).forEach(([userId, expectedNet]) => {
       const total = totals.find((entry) => entry.userId === userId);

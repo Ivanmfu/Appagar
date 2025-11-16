@@ -183,26 +183,29 @@ export interface Database {
       settlements: {
         Row: {
           id: string
-          group_id: string
+          group_id: string | null
           from_user_id: string
           to_user_id: string
           amount_minor: number
+          created_at: string | null
           settled_at: string | null
         }
         Insert: {
           id?: string
-          group_id: string
+          group_id?: string | null
           from_user_id: string
           to_user_id: string
           amount_minor: number
+          created_at?: string | null
           settled_at?: string | null
         }
         Update: {
           id?: string
-          group_id?: string
+          group_id?: string | null
           from_user_id?: string
           to_user_id?: string
           amount_minor?: number
+          created_at?: string | null
           settled_at?: string | null
         }
         Relationships: []

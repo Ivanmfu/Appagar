@@ -7,6 +7,7 @@ import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
 import { EditExpenseModal } from '@/components/groups/EditExpenseModal';
 import { deleteGroup, fetchGroupDetail } from '@/lib/groups';
 import { simplifyGroupDebts } from '@/lib/balance';
+import { settleGroupDebt } from '@/lib/settlements';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -30,6 +31,21 @@ function formatDate(input?: string | null) {
   }
 }
 
+function formatCurrency(minor: number, currency: string) {
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency,
+  }).format(minor / 100);
+}
+
+type SettlementPrompt = {
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+  fromName: string;
+  toName: string;
+};
+
 export default function GroupDetailPage({ searchParams }: DetailPageProps) {
   const { user } = useAuth();
   const router = useRouter();
@@ -42,6 +58,7 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
   const [expenseToEdit, setExpenseToEdit] = useState<GroupExpense | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingSettlement, setPendingSettlement] = useState<SettlementPrompt | null>(null);
 
   useEffect(() => {
     if (!rawGroupId) return;
@@ -86,6 +103,66 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
     if (!groupId) return;
     simplifyMutation.mutate(groupId);
   }, [groupId, simplifyMutation]);
+
+  const currentUserId = user?.id ?? null;
+
+  const settlementMutation = useMutation({
+    mutationFn: async ({
+      groupId: targetGroupId,
+      fromUserId,
+      toUserId,
+      amountCents,
+    }: {
+      groupId: string;
+      fromUserId: string;
+      toUserId: string;
+      amountCents: number;
+    }) =>
+      settleGroupDebt({
+        groupId: targetGroupId,
+        fromUserId,
+        toUserId,
+        amountMinor: amountCents,
+      }),
+    onSuccess: async (_result, variables) => {
+      setPendingSettlement(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['group-detail', variables.groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
+      ]);
+    },
+    onError: () => {
+      // `pendingSettlement` se mantiene para permitir reintentar tras mostrar el error.
+    },
+  });
+
+  const handleSettleRequest = useCallback(
+    (payload: {
+      fromUserId: string;
+      toUserId: string;
+      amountCents: number;
+      fromName: string;
+      toName: string;
+    }) => {
+      setPendingSettlement(payload);
+    },
+    []
+  );
+
+  const confirmSettlement = useCallback(() => {
+    if (!groupId || !pendingSettlement) return;
+    settlementMutation.mutate({
+      groupId,
+      fromUserId: pendingSettlement.fromUserId,
+      toUserId: pendingSettlement.toUserId,
+      amountCents: pendingSettlement.amountCents,
+    });
+  }, [groupId, pendingSettlement, settlementMutation]);
+
+  const cancelSettlement = useCallback(() => {
+    if (settlementMutation.isPending) return;
+    setPendingSettlement(null);
+  }, [settlementMutation]);
 
   const handleExpenseSelect = useCallback((expense: GroupExpense) => {
     setExpenseToEdit(expense);
@@ -214,13 +291,20 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
           expenses={detail.expenses}
           members={detail.members}
           balance={detail.balances}
-          currentUserId={user?.id ?? undefined}
+          currentUserId={currentUserId ?? undefined}
           onSimplify={handleSimplify}
           simplifyLoading={simplifyMutation.isPending}
+          onSettleRequest={handleSettleRequest}
+          settlementLoading={settlementMutation.isPending}
         />
         {simplifyMutation.error && (
           <p className="mt-4 text-sm text-red-300">
             {(simplifyMutation.error as Error).message ?? 'No se pudo simplificar las deudas en este momento.'}
+          </p>
+        )}
+        {settlementMutation.error && (
+          <p className="mt-4 text-sm text-red-300">
+            {(settlementMutation.error as Error).message ?? 'No se pudo registrar la liquidación.'}
           </p>
         )}
       </section>
@@ -331,6 +415,42 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
                   disabled={deleteMutation.isPending}
                 >
                   {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar definitivamente'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingSettlement && groupId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-10 backdrop-blur">
+          <div className="absolute inset-0" onClick={settlementMutation.isPending ? undefined : cancelSettlement} />
+          <div className="relative z-10 w-full max-w-lg">
+            <div className="space-y-5 rounded-3xl border border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl shadow-2xl shadow-black/30">
+              <h2 className="text-xl font-semibold text-white">¿Registrar liquidación?</h2>
+              <p className="text-sm text-slate-200/80">
+                {currentUserId === pendingSettlement.fromUserId
+                  ? `Confirmarás que pagas ${formatCurrency(pendingSettlement.amountCents, detail.group.base_currency)} a ${pendingSettlement.toName}.`
+                  : currentUserId === pendingSettlement.toUserId
+                    ? `Confirmarás que recibes ${formatCurrency(pendingSettlement.amountCents, detail.group.base_currency)} de ${pendingSettlement.fromName}.`
+                    : `Registrarás que ${pendingSettlement.fromName} paga ${formatCurrency(pendingSettlement.amountCents, detail.group.base_currency)} a ${pendingSettlement.toName}.`}
+              </p>
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={cancelSettlement}
+                  disabled={settlementMutation.isPending}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={confirmSettlement}
+                  disabled={settlementMutation.isPending}
+                >
+                  {settlementMutation.isPending ? 'Registrando...' : 'Confirmar liquidación'}
                 </button>
               </div>
             </div>
