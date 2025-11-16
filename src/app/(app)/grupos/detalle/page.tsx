@@ -4,12 +4,14 @@ import { useAuth } from '@/components/AuthGate';
 import { GroupBalanceCard } from '@/components/groups/GroupBalanceCard';
 import { ExpenseList } from '@/components/groups/ExpenseList';
 import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
-import { fetchGroupDetail } from '@/lib/groups';
+import { EditExpenseModal } from '@/components/groups/EditExpenseModal';
+import { deleteGroup, fetchGroupDetail } from '@/lib/groups';
 import { simplifyGroupDebts } from '@/lib/balance';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { GroupExpense } from '@/lib/groups';
 
 type DetailPageProps = {
   searchParams?: {
@@ -37,6 +39,9 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
     if (!rawGroupId) return null;
     return Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
   });
+  const [expenseToEdit, setExpenseToEdit] = useState<GroupExpense | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (!rawGroupId) return;
@@ -81,6 +86,30 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
     if (!groupId) return;
     simplifyMutation.mutate(groupId);
   }, [groupId, simplifyMutation]);
+
+  const handleExpenseSelect = useCallback((expense: GroupExpense) => {
+    setExpenseToEdit(expense);
+    setIsEditOpen(true);
+  }, []);
+
+  const closeExpenseEditor = useCallback(() => {
+    setIsEditOpen(false);
+    setExpenseToEdit(null);
+  }, []);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (targetGroupId: string) => deleteGroup(targetGroupId),
+    onSuccess: async (_data, targetGroupId) => {
+      setShowDeleteConfirm(false);
+      setExpenseToEdit(null);
+      setIsEditOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['group-detail', targetGroupId] }),
+      ]);
+      router.replace('/grupos');
+    },
+  });
 
   const creatorDisplayName = useMemo(() => {
     const detail = detailQuery.data;
@@ -141,6 +170,7 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
 
   const movementCount = detail.expenses.length;
   const activeMembersCount = detail.members.length;
+  const canDeleteGroup = user?.id === detail.group.created_by;
 
   return (
     <div className="space-y-6">
@@ -191,7 +221,11 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
 
       <section className={`${CARD_CLASS} space-y-4`}>
         <h3 className="text-lg font-semibold text-white">Gastos recientes</h3>
-        <ExpenseList baseCurrency={detail.group.base_currency} expenses={detail.expenses} />
+        <ExpenseList
+          baseCurrency={detail.group.base_currency}
+          expenses={detail.expenses}
+          onSelect={handleExpenseSelect}
+        />
       </section>
 
       <section className={`${CARD_CLASS} space-y-4`}>
@@ -232,6 +266,71 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
           </div>
         )}
       </section>
+
+      {canDeleteGroup && (
+        <section className={`${CARD_CLASS} space-y-4`}>
+          <div>
+            <h3 className="text-lg font-semibold text-white">Zona peligrosa</h3>
+            <p className="text-sm text-slate-200/80">
+              Eliminar este grupo borrará todos los gastos, participantes y liquidaciones asociadas. Esta acción no se puede deshacer.
+            </p>
+          </div>
+          {deleteMutation.error && (
+            <p className="text-sm text-red-300">
+              {(deleteMutation.error as Error).message ?? 'No se pudo eliminar el grupo en este momento.'}
+            </p>
+          )}
+          <button
+            type="button"
+            className="w-full rounded-full border border-red-400/40 bg-red-500/20 px-6 py-3 text-sm font-semibold text-red-200 transition hover:border-red-300 hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={deleteMutation.isPending}
+          >
+            Eliminar grupo
+          </button>
+        </section>
+      )}
+
+      <EditExpenseModal
+        baseCurrency={detail.group.base_currency}
+        expense={expenseToEdit}
+        groupId={detail.group.id}
+        isOpen={isEditOpen && Boolean(expenseToEdit)}
+        members={detail.members}
+        onClose={closeExpenseEditor}
+      />
+
+      {showDeleteConfirm && groupId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-10 backdrop-blur">
+          <div className="absolute inset-0" onClick={() => (deleteMutation.isPending ? null : setShowDeleteConfirm(false))} />
+          <div className="relative z-10 w-full max-w-lg">
+            <div className="space-y-5 rounded-3xl border border-white/10 bg-slate-950/70 p-6 backdrop-blur-xl shadow-2xl shadow-black/30">
+              <h2 className="text-xl font-semibold text-white">¿Eliminar el grupo?</h2>
+              <p className="text-sm text-slate-200/80">
+                Esta operación eliminará permanentemente todos los gastos, miembros y asentamientos asociados a este grupo. No podrás recuperarlos más adelante.
+              </p>
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleteMutation.isPending}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-red-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-red-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={() => deleteMutation.mutate(groupId)}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar definitivamente'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

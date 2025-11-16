@@ -417,3 +417,62 @@ export async function createGroup({
 
   return group as GroupRow;
 }
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  const supabase = getSupabaseClient();
+
+  const { data: expenseRows, error: expensesError } = await supabase
+    .from('expenses')
+    .select('id')
+    .eq('group_id', groupId);
+
+  if (expensesError) throw expensesError;
+
+  const expenseIds = (expenseRows ?? []).map((row) => row.id);
+
+  if (expenseIds.length > 0) {
+    const { error: participantsError } = await supabase
+      .from('expense_participants')
+      .delete()
+      .in('expense_id', expenseIds);
+
+    if (participantsError) throw participantsError;
+  }
+
+  const { error: settlementsError } = await supabase
+    .from('settlements')
+    .delete()
+    .eq('group_id', groupId);
+
+  if (settlementsError) throw settlementsError;
+
+  if (expenseIds.length > 0) {
+    const { error: deleteExpensesError } = await supabase
+      .from('expenses')
+      .delete()
+      .in('id', expenseIds);
+
+    if (deleteExpensesError) throw deleteExpensesError;
+  }
+
+  const { error: invitesError } = await supabase
+    .from('group_invites')
+    .delete()
+    .eq('group_id', groupId);
+
+  if (invitesError) throw invitesError;
+
+  const { error: membersError } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId);
+
+  if (membersError) throw membersError;
+
+  const { error: groupError } = await supabase
+    .from('groups')
+    .delete()
+    .eq('id', groupId);
+
+  if (groupError) throw groupError;
+}

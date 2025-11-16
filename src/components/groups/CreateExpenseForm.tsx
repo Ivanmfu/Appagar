@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
 import { useAuth } from '@/components/AuthGate';
-import { createExpense } from '@/lib/expenses';
-import type { GroupMember } from '@/lib/groups';
+import type { GroupExpense, GroupMember } from '@/lib/groups';
+import { createExpense, updateExpense } from '@/lib/expenses';
 import { splitEvenlyInCents } from '@/lib/money';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
@@ -11,7 +11,10 @@ type Props = {
   groupId: string;
   members: GroupMember[];
   baseCurrency: string;
+  expense?: GroupExpense | null;
+  mode?: 'create' | 'edit';
   onSuccess?: () => void;
+  onCancel?: () => void;
 };
 
 type SplitMode = 'equal' | 'custom';
@@ -23,9 +26,34 @@ function formatCurrency(minor: number, currency: string) {
   }).format(minor / 100);
 }
 
-export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }: Props) {
+function toInputMinor(minor: number) {
+  return (minor / 100).toFixed(2).replace('.', ',');
+}
+
+function normalizeDate(input?: string | null) {
+  if (!input) {
+    return new Date().toISOString().slice(0, 10);
+  }
+  try {
+    return new Date(input).toISOString().slice(0, 10);
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+export function CreateExpenseForm({
+  groupId,
+  members,
+  baseCurrency,
+  expense = null,
+  mode,
+  onSuccess,
+  onCancel,
+}: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const resolvedMode: 'create' | 'edit' = mode ?? (expense ? 'edit' : 'create');
+  const isEditing = resolvedMode === 'edit';
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -34,6 +62,45 @@ export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }:
   const [error, setError] = useState<string | null>(null);
   const [splitMode, setSplitMode] = useState<SplitMode>('equal');
   const [customShares, setCustomShares] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!expense) return;
+
+    setAmount(toInputMinor(expense.amountMinor));
+    setNote(expense.note ?? '');
+    setDate(normalizeDate(expense.date ?? expense.createdAt));
+    if (expense.payerId) {
+      setPayerId(expense.payerId);
+    }
+
+    const participantIdsFromExpense = expense.participants.map((participant) => participant.userId);
+    if (participantIdsFromExpense.length > 0) {
+      setParticipantIds(participantIdsFromExpense);
+    }
+
+    setCustomShares(() => {
+      const next: Record<string, string> = {};
+      expense.participants.forEach((participant) => {
+        next[participant.userId] = toInputMinor(participant.shareMinor);
+      });
+      return next;
+    });
+
+    const totalCents = expense.amountMinor;
+    const equalShares = participantIdsFromExpense.length
+      ? splitEvenlyInCents(totalCents, participantIdsFromExpense.length)
+      : [];
+
+    const isEqualSplit =
+      participantIdsFromExpense.length > 0 &&
+      expense.participants.length === equalShares.length &&
+      expense.participants.every((participant, index) => {
+        const expected = equalShares[index] ?? 0;
+        return Math.abs(participant.shareMinor - expected) <= 1;
+      });
+
+    setSplitMode(isEqualSplit ? 'equal' : 'custom');
+  }, [expense]);
 
   useEffect(() => {
     if (members.length === 0) return;
@@ -143,14 +210,26 @@ export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }:
         }));
       }
 
-      return createExpense({
+      const payload = {
         groupId,
         payerId,
         totalCents,
-        currency: baseCurrency,
+        currency: expense?.currency ?? baseCurrency,
         shares,
         note: note.trim() ? note.trim() : undefined,
         date,
+      };
+
+      if (isEditing && expense) {
+        return updateExpense({
+          ...payload,
+          expenseId: expense.id,
+          updatedBy: user.id,
+        });
+      }
+
+      return createExpense({
+        ...payload,
         createdBy: user.id,
       });
     },
@@ -160,11 +239,15 @@ export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }:
         queryClient.invalidateQueries({ queryKey: ['group-expenses', groupId] }),
         queryClient.invalidateQueries({ queryKey: ['group-balance', groupId] }),
       ]);
-      setAmount('');
-      setNote('');
-      setParticipantIds(members.map((m) => m.userId));
-      setSplitMode('equal');
-      setCustomShares({});
+
+      if (!isEditing) {
+        setAmount('');
+        setNote('');
+        setParticipantIds(members.map((m) => m.userId));
+        setSplitMode('equal');
+        setCustomShares({});
+      }
+
       onSuccess?.();
     },
     onError: (err: unknown) => {
@@ -211,11 +294,19 @@ export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }:
     }));
   }, [amount, participantIds, splitMode, customShares]);
 
+  const showAverageShareHint = splitMode === 'equal' && previewShares.length > 0;
+
   return (
     <form className="space-y-5 text-sm text-slate-100" onSubmit={onSubmit}>
       <div className="space-y-1">
-        <h3 className="text-base font-semibold text-white">Registrar gasto</h3>
-        <p className="text-xs text-slate-300">Selecciona quién participa y cómo quieres repartir el importe.</p>
+        <h3 className="text-base font-semibold text-white">
+          {isEditing ? 'Editar gasto' : 'Registrar gasto'}
+        </h3>
+        <p className="text-xs text-slate-300">
+          {isEditing
+            ? 'Actualiza los participantes, el importe o quién pagó este gasto.'
+            : 'Selecciona quién participa y cómo quieres repartir el importe.'}
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -293,7 +384,7 @@ export function CreateExpenseForm({ groupId, members, baseCurrency, onSuccess }:
             onClick={() => setSplitMode('custom')}
           >
             Reparto personalizado
-$          </button>
+          </button>
         </div>
       </fieldset>
 
@@ -305,30 +396,36 @@ $          </button>
             return (
               <label
                 key={member.userId}
-                className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition ${
-                  checked ? 'border-white/40 bg-white/10' : 'border-white/10 bg-black/20 hover:border-white/30 hover:bg-white/10'
+                className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 transition ${
+                  checked
+                    ? 'border-white/40 bg-white/10'
+                    : 'border-white/10 bg-black/20 hover:border-white/30 hover:bg-white/10'
                 }`}
               >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-white/30 bg-black/40 text-indigo-400 focus:ring-indigo-300"
-                  checked={checked}
-                  onChange={() => toggleParticipant(member.userId)}
-                />
-                <span className="text-sm text-slate-100">
-                  {member.displayName ?? member.email ?? 'Miembro'}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-white/30 bg-black/40 text-indigo-400 focus:ring-indigo-300"
+                        checked={checked}
+                        onChange={() => toggleParticipant(member.userId)}
+                      />
+                      <span className="text-sm text-slate-100">
+                        {member.displayName ?? member.email ?? 'Miembro'}
+                      </span>
+                    </div>
                   {checked && previewShares.length > 0 && (
-                    <span className="block text-xs text-slate-300">
+                    <span className="text-xs text-slate-300">
                       {formatCurrency(
                         previewShares.find((share) => share.userId === member.userId)?.share ?? 0,
                         baseCurrency
                       )}
                     </span>
                   )}
-                </span>
+                </div>
                 {splitMode === 'custom' && checked && (
                   <input
-                    className="mt-2 w-full rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
+                    className="w-full rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
                     placeholder="0,00"
                     value={customShares[member.userId] ?? ''}
                     onChange={(event) =>
@@ -348,14 +445,32 @@ $          </button>
 
       {error && <p className="text-sm text-red-300">{error}</p>}
 
-      <button
-        className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={mutation.isPending}
-        type="submit"
-      >
-        {mutation.isPending ? 'Guardando...' : 'Guardar gasto'}
-      </button>
-      {previewShares.length > 0 && (
+      <div className="flex flex-wrap items-center gap-3">
+        {onCancel && (
+          <button
+            type="button"
+            className="rounded-full border border-white/20 bg-transparent px-6 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={onCancel}
+            disabled={mutation.isPending}
+          >
+            Cancelar
+          </button>
+        )}
+        <button
+          className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={mutation.isPending}
+          type="submit"
+        >
+          {mutation.isPending
+            ? isEditing
+              ? 'Guardando cambios...'
+              : 'Guardando...'
+            : isEditing
+            ? 'Guardar cambios'
+            : 'Guardar gasto'}
+        </button>
+      </div>
+      {showAverageShareHint && (
         <p className="text-xs text-slate-300">
           Cada participante aporta aproximadamente {formatCurrency(previewShares[0].share, baseCurrency)}
         </p>
