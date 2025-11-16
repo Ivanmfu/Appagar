@@ -260,17 +260,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
   }, [loading, user, router]);
 
-  if (loading) {
-    return (
-      <div className="p-6 text-center space-y-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-        <div className="text-gray-500">Comprobando sesión...</div>
-        <div className="text-xs text-gray-400">Si esto tarda mucho, recarga la página</div>
-      </div>
-    );
-  }
-
-  if (!user) {
+  if (!user && !loading) {
     return null;
   }
 
