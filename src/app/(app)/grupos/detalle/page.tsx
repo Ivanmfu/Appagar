@@ -118,6 +118,12 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
     return owner?.displayName ?? owner?.email ?? detail.group.created_by;
   }, [detailQuery.data]);
 
+  const currentMemberRole = useMemo(() => {
+    const detail = detailQuery.data;
+    if (!detail || !user?.id) return null;
+    return detail.members.find((member) => member.userId === user.id)?.role ?? null;
+  }, [detailQuery.data, user?.id]);
+
   const pendingInvites = useMemo(() => {
     const invites = detailQuery.data?.invites ?? [];
     return invites.filter((invite) => {
@@ -170,7 +176,7 @@ export default function GroupDetailPage({ searchParams }: DetailPageProps) {
 
   const movementCount = detail.expenses.length;
   const activeMembersCount = detail.members.length;
-  const canDeleteGroup = user?.id === detail.group.created_by;
+  const canDeleteGroup = currentMemberRole === 'owner' || user?.id === detail.group.created_by;
 
   return (
     <div className="space-y-6">
