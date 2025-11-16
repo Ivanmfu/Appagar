@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useAuth } from '@/components/AuthGate';
 import { createGroup, fetchUserGroups, GroupSummary } from '@/lib/groups';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
