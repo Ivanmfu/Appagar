@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useAuth } from '@/components/AuthGate';
 import { GroupBalanceCard } from '@/components/groups/GroupBalanceCard';
 import { ExpenseList } from '@/components/groups/ExpenseList';
@@ -16,15 +14,69 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { GroupExpense } from '@/lib/groups';
 
-type DetailPageProps = {
+export type DetailPageProps = {
   searchParams?: {
-    export const dynamic = 'force-dynamic';
+    id?: string | string[];
+  };
+};
 
-    import GroupDetailPageClient from './GroupDetailPageClient';
-    import type { DetailPageProps } from './GroupDetailPageClient';
+const CARD_CLASS = 'rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-xl shadow-xl shadow-black/20';
 
-    export default function GroupDetailPage(props: DetailPageProps) {
-      return <GroupDetailPageClient {...props} />;
+function formatDate(input?: string | null) {
+  if (!input) return '—';
+  try {
+    return new Date(input).toLocaleDateString();
+  } catch {
+    return '—';
+  }
+}
+
+function formatCurrency(minor: number, currency: string) {
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency,
+  }).format(minor / 100);
+}
+
+type SettlementPrompt = {
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+  fromName: string;
+  toName: string;
+};
+
+export default function GroupDetailPageClient({ searchParams }: DetailPageProps) {
+  const { user } = useAuth();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const rawGroupId = searchParams?.id;
+  const [groupId, setGroupId] = useState<string | null>(() => {
+    if (!rawGroupId) return null;
+    return Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
+  });
+  const [expenseToEdit, setExpenseToEdit] = useState<GroupExpense | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingSettlement, setPendingSettlement] = useState<SettlementPrompt | null>(null);
+
+  useEffect(() => {
+    if (!rawGroupId) return;
+    const resolvedId = Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
+    setGroupId(resolvedId);
+  }, [rawGroupId]);
+
+  useEffect(() => {
+    if (groupId) return;
+    if (typeof window === 'undefined') return;
+
+    const urlGroupId = new URLSearchParams(window.location.search).get('id');
+    if (urlGroupId) {
+      setGroupId(urlGroupId);
+      return;
+    }
+
+    router.replace('/grupos');
   }, [groupId, router]);
 
   const detailQuery = useQuery({
