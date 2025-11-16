@@ -1,10 +1,18 @@
-export const dynamic = 'force-dynamic';
+'use client';
 
-import DashboardPageClient from './DashboardPageClient';
+import { useAuth } from '@/components/AuthGate';
+import {
+  fetchUserDebtRelations,
+  fetchUserGroups,
+  GroupSummary,
+  UserDebtRelation,
+} from '@/lib/groups';
+import { settleGroupDebt } from '@/lib/settlements';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
 
-export default function DashboardPage() {
-  return <DashboardPageClient />;
-}
+const CARD_CLASS = 'rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-xl shadow-xl shadow-black/20';
 
 function formatDate(input?: string | null) {
   if (!input) return '—';
@@ -32,7 +40,7 @@ function describeBalance(minor: number, currency: string) {
   return 'Todo en orden ✨';
 }
 
-export default function DashboardPage() {
+export default function DashboardPageClient() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showIncomingModal, setShowIncomingModal] = useState(false);
