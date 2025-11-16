@@ -7,7 +7,6 @@ import {
   GroupSummary,
   UserDebtRelation,
 } from '@/lib/groups';
-import { fetchPendingInvitesForEmail } from '@/lib/invites';
 import { settleGroupDebt } from '@/lib/settlements';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -42,7 +41,7 @@ function describeBalance(minor: number, currency: string) {
 }
 
 export default function DashboardPage() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showIncomingModal, setShowIncomingModal] = useState(false);
   const [showOutgoingModal, setShowOutgoingModal] = useState(false);
@@ -65,16 +64,6 @@ export default function DashboardPage() {
       return fetchUserDebtRelations(user.id);
     },
     staleTime: 15_000,
-  });
-
-  const invitesQuery = useQuery({
-    queryKey: ['invites', profile?.email ?? user?.email],
-    enabled: Boolean(profile?.email ?? user?.email),
-    queryFn: async () => {
-      const email = profile?.email ?? user?.email;
-      if (!email) return [];
-      return fetchPendingInvitesForEmail(email);
-    },
   });
 
   const baseCurrency = useMemo(() => groupsQuery.data?.[0]?.baseCurrency ?? 'EUR', [groupsQuery.data]);
@@ -102,7 +91,6 @@ export default function DashboardPage() {
     return accumulator;
   }, [groupsQuery.data]);
 
-  const pendingInvites = invitesQuery.data ?? [];
   const isEverythingSettled = globalBalance.positive === 0 && globalBalance.negative === 0;
 
   const incomingRelations = useMemo(
@@ -208,11 +196,6 @@ export default function DashboardPage() {
             <dd className="mt-2 text-3xl font-semibold text-white">{groupsQuery.data?.length ?? 0}</dd>
             <p className="mt-1 text-xs text-slate-300">Activos en tu cuenta</p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/40">
-            <dt className="text-xs uppercase tracking-[0.25em] text-slate-300">Invitaciones</dt>
-            <dd className="mt-2 text-3xl font-semibold text-white">{pendingInvites.length}</dd>
-            <p className="mt-1 text-xs text-slate-300">Pendientes de respuesta</p>
-          </div>
         </dl>
       </section>
 
@@ -272,54 +255,6 @@ export default function DashboardPage() {
           )
         )}
       </section>
-
-      {pendingInvites.length > 0 ? (
-        <section className={`${CARD_CLASS} space-y-4`}>
-          <header className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Invitaciones recientes</h2>
-            <span className="text-xs text-slate-300">{pendingInvites.length} activas</span>
-          </header>
-
-          {invitesQuery.isLoading && <p className="text-sm text-slate-300">Buscando invitaciones...</p>}
-
-          {!invitesQuery.isLoading && (
-            <ul className="space-y-3 text-sm text-slate-100">
-              {pendingInvites.map((invite) => (
-                <li
-                  key={invite.id}
-                  className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
-                >
-                  <div>
-                    <p className="font-medium text-white">Invitación para {invite.email}</p>
-                    <p className="text-xs text-slate-300">Expira {formatDate(invite.expiresAt)}</p>
-                  </div>
-                  <Link
-                    className="text-xs font-semibold text-indigo-200 underline-offset-2 hover:text-white hover:underline"
-                    href={`/invite?token=${invite.token}`}
-                  >
-                    Ver enlace
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      ) : (
-        <section className={`${CARD_CLASS} space-y-4`}>
-          <h2 className="text-lg font-semibold text-white">Invita a tus amigos</h2>
-          <p className="text-sm text-slate-200/80">
-            No tienes invitaciones pendientes. Usa el botón flotante o entra en un grupo para invitar a nuevas personas y repartir gastos.
-          </p>
-          <div className="flex flex-wrap gap-3 text-xs text-indigo-200">
-            <Link className="underline-offset-2 hover:text-white hover:underline" href="/grupos">
-              Crear o abrir un grupo
-            </Link>
-            <Link className="underline-offset-2 hover:text-white hover:underline" href="/amigos">
-              Ver personas con las que compartes gastos
-            </Link>
-          </div>
-        </section>
-      )}
 
       {showIncomingModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-10 backdrop-blur">
