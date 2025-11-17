@@ -149,19 +149,22 @@ export async function fetchActivityFeed(userId: string | null): Promise<Activity
 		new Set(events.map((event) => event.group_id).filter((id): id is string => Boolean(id)))
 	);
 
+	type ProfileLite = Pick<Database['public']['Tables']['profiles']['Row'], 'id' | 'display_name' | 'email'>;
+	type GroupLite = Pick<Database['public']['Tables']['groups']['Row'], 'id' | 'name'>;
+
 	const [profilesRes, groupsRes] = await Promise.all([
 		actorIds.length
 			? supabase
 					.from('profiles')
 					.select('id, display_name, email')
 					.in('id', actorIds)
-			: Promise.resolve({ data: [] as Database['public']['Tables']['profiles']['Row'][] | null, error: null }),
+			: Promise.resolve({ data: [] as ProfileLite[] | null, error: null }),
 		relatedGroupIds.length
 			? supabase
 					.from('groups')
 					.select('id, name')
 					.in('id', relatedGroupIds)
-			: Promise.resolve({ data: [] as Database['public']['Tables']['groups']['Row'][] | null, error: null }),
+			: Promise.resolve({ data: [] as GroupLite[] | null, error: null }),
 	]);
 
 	if (profilesRes.error) {
@@ -171,12 +174,12 @@ export async function fetchActivityFeed(userId: string | null): Promise<Activity
 		throw groupsRes.error;
 	}
 
-	const profileMap = new Map<string, Database['public']['Tables']['profiles']['Row']>();
+	const profileMap = new Map<string, ProfileLite>();
 	(profilesRes.data ?? []).forEach((profile) => {
 		profileMap.set(profile.id, profile);
 	});
 
-	const groupMap = new Map<string, Database['public']['Tables']['groups']['Row']>();
+	const groupMap = new Map<string, GroupLite>();
 	(groupsRes.data ?? []).forEach((group) => {
 		groupMap.set(group.id, group);
 	});
