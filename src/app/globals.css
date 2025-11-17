@@ -1,3 +1,45 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  
+  body {
+    @apply bg-app-bg text-text-primary font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-white/60 backdrop-blur-md border border-white/60 shadow-sm rounded-2xl;
+  }
+  
+  .glass-success {
+    @apply bg-success-soft/70 backdrop-blur-md border border-white/60 shadow-sm rounded-2xl;
+  }
+  
+  .glass-danger {
+    @apply bg-danger-soft/70 backdrop-blur-md border border-white/60 shadow-sm rounded-2xl;
+  }
+  
+  .glass-primary {
+    @apply bg-primary-soft/70 backdrop-blur-md border border-white/60 shadow-sm rounded-2xl;
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-white rounded-full px-4 py-2 font-medium shadow-sm hover:bg-primary-hover hover:shadow-md transition-all;
+  }
+  
+  .btn-secondary {
+    @apply bg-white/70 backdrop-blur-sm border border-input-border text-text-primary rounded-full px-4 py-2 font-medium hover:bg-slate-50 transition-all;
+  }
+  
+  .btn-danger {
+    @apply bg-white/70 backdrop-blur-sm border border-danger text-danger rounded-full px-4 py-2 font-medium hover:bg-danger-soft/30 transition-all;
+  }
+  
+  .input-field {
+    @apply bg-white/80 backdrop-blur-sm border border-input-border rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-secondary focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all;
+  }
+}

@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 
-const CARD_CLASS = 'rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-xl shadow-xl shadow-black/20';
+const CARD_CLASS = 'glass-card p-6';
 
 function formatDate(input?: string | null) {
   if (!input) return '—';
@@ -122,13 +122,13 @@ export default function GroupsPageClient() {
       <section className={`${CARD_CLASS} space-y-6`}>
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-white">Gestiona tus grupos</h2>
-            <p className="text-sm text-slate-200/80">
+            <h2 className="text-lg font-semibold text-text-primary">Gestiona tus grupos</h2>
+            <p className="text-sm text-text-secondary">
               Crea un nuevo espacio o entra en uno existente para registrar gastos compartidos.
             </p>
           </div>
           <button
-            className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:scale-105"
+            className="btn-primary"
             onClick={() => setCreateOpen(true)}
             type="button"
           >
@@ -137,14 +137,14 @@ export default function GroupsPageClient() {
         </header>
 
         {createOpen && (
-          <form className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner shadow-black/30" onSubmit={handleSubmit}>
+          <form className="glass-card grid gap-4 p-5" onSubmit={handleSubmit}>
             <div className="flex flex-col gap-2 text-sm">
-              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-200/80" htmlFor="group-name">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-text-secondary" htmlFor="group-name">
                 Nombre del grupo
               </label>
               <input
                 id="group-name"
-                className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
+                className="input-field"
                 placeholder="Viaje a la Sierra"
                 value={groupName}
                 onChange={(event) => setGroupName(event.target.value)}
@@ -153,14 +153,14 @@ export default function GroupsPageClient() {
             </div>
             <div className="flex flex-wrap gap-3">
               <button
-                className="rounded-full bg-white/90 px-5 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white"
+                className="btn-primary disabled:opacity-60"
                 disabled={createGroupMutation.isPending}
                 type="submit"
               >
                 {createGroupMutation.isPending ? 'Creando...' : 'Crear y entrar'}
               </button>
               <button
-                className="rounded-full border border-white/20 px-5 py-2 text-sm font-medium text-white/80 transition hover:text-white"
+                className="btn-secondary"
                 onClick={closeCreate}
                 type="button"
               >
@@ -168,7 +168,7 @@ export default function GroupsPageClient() {
               </button>
             </div>
             {createGroupMutation.error && (
-              <p className="text-sm text-red-300">
+              <p className="text-sm text-danger">
                 {(createGroupMutation.error as Error).message ?? 'No se pudo crear el grupo'}
               </p>
             )}
@@ -178,13 +178,13 @@ export default function GroupsPageClient() {
 
       <section className={`${CARD_CLASS} space-y-4`}>
         <header className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Grupos activos</h2>
-          <span className="text-xs text-slate-300">{activeGroups.length} en curso</span>
+          <h2 className="text-lg font-semibold text-text-primary">Grupos activos</h2>
+          <span className="text-xs text-text-secondary">{activeGroups.length} en curso</span>
         </header>
 
-        {groupsQuery.isLoading && <p className="text-sm text-slate-300">Cargando grupos...</p>}
+        {groupsQuery.isLoading && <p className="text-sm text-text-secondary">Cargando grupos...</p>}
         {groupsQuery.error && (
-          <p className="text-sm text-red-300">
+          <p className="text-sm text-danger">
             {(groupsQuery.error as Error).message ?? 'No se pudieron cargar los grupos'}
           </p>
         )}
@@ -195,19 +195,19 @@ export default function GroupsPageClient() {
               const balanceCopy = describeBalance(group.userNetBalanceMinor, group.baseCurrency);
               const balanceTone =
                 group.userNetBalanceMinor > 0
-                  ? 'text-emerald-200'
-                  : 'text-rose-200';
+                  ? 'text-success'
+                  : 'text-danger';
               return (
                 <Link
                   key={group.id}
-                  className="group rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-white/30 hover:bg-white/10"
+                  className="glass-card group p-5 transition hover:-translate-y-[1px] hover:shadow-md"
                   href={`/grupos/detalle?id=${group.id}`}
                 >
                   <header className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-white">{group.name}</h3>
-                    <span className="text-xs text-white/70">{group.memberCount} miembros</span>
+                    <h3 className="text-base font-semibold text-text-primary">{group.name}</h3>
+                    <span className="text-xs text-text-secondary">{group.memberCount} miembros</span>
                   </header>
-                  <div className="mt-3 space-y-1 text-xs text-slate-200/70">
+                  <div className="mt-3 space-y-1 text-xs text-text-secondary">
                     <p>Creado {formatDate(group.createdAt)}</p>
                     <p>Último gasto {formatDate(group.lastExpenseAt)} · Base {group.baseCurrency}</p>
                     <p>Total del grupo {formatCurrency(group.totalSpendMinor, group.baseCurrency)}</p>
@@ -219,7 +219,7 @@ export default function GroupsPageClient() {
           </div>
         ) : (
           !groupsQuery.isLoading && (
-            <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-slate-200/80">
+            <div className="rounded-2xl border border-dashed border-border-subtle bg-muted-bg/30 p-6 text-center text-sm text-text-secondary">
               {hasAnyGroup
                 ? 'Ya no tienes cuentas pendientes en tus grupos activos.'
                 : 'Todavía no perteneces a ningún grupo. Crea uno nuevo y comparte el enlace con tus amigos.'}
@@ -230,14 +230,14 @@ export default function GroupsPageClient() {
 
       <section className={`${CARD_CLASS} space-y-4`}>
         <header className="space-y-1">
-          <h2 className="text-lg font-semibold text-white">Grupos con cuentas saldadas</h2>
-          <p className="text-sm text-slate-200/80">Aquí verás los grupos donde tu saldo neto es cero.</p>
+          <h2 className="text-lg font-semibold text-text-primary">Grupos con cuentas saldadas</h2>
+          <p className="text-sm text-text-secondary">Aquí verás los grupos donde tu saldo neto es cero.</p>
         </header>
 
-        {groupsQuery.isLoading && <p className="text-sm text-slate-300">Comprobando grupos...</p>}
+        {groupsQuery.isLoading && <p className="text-sm text-text-secondary">Comprobando grupos...</p>}
 
         {!groupsQuery.isLoading && settledGroups.length === 0 && (
-          <p className="text-sm text-slate-200/70">Aún no tienes grupos totalmente saldados. ¡Sigue equilibrando gastos!</p>
+          <p className="text-sm text-text-secondary">Aún no tienes grupos totalmente saldados. ¡Sigue equilibrando gastos!</p>
         )}
 
         {settledGroups.length > 0 && (
@@ -245,14 +245,14 @@ export default function GroupsPageClient() {
             {settledGroups.map((group) => (
               <Link
                 key={group.id}
-                className="rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:border-white/30 hover:bg-white/10"
+                className="glass-card p-5 transition hover:-translate-y-[1px] hover:shadow-md"
                 href={`/grupos/detalle?id=${group.id}`}
               >
                 <header className="flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-white">{group.name}</h3>
-                  <span className="text-xs text-emerald-200">Todo en orden ✨</span>
+                  <h3 className="text-base font-semibold text-text-primary">{group.name}</h3>
+                  <span className="text-xs text-success">Todo en orden ✨</span>
                 </header>
-                <div className="mt-3 space-y-1 text-xs text-slate-200/70">
+                <div className="mt-3 space-y-1 text-xs text-text-secondary">
                   <p>Creado {formatDate(group.createdAt)}</p>
                   <p>Último movimiento {formatDate(group.lastExpenseAt)} · Base {group.baseCurrency}</p>
                   <p>Total del grupo {formatCurrency(group.totalSpendMinor, group.baseCurrency)}</p>
