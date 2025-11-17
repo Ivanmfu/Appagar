@@ -156,7 +156,12 @@ export default function GroupDetailPageClient() {
   }, []);
 
   const deleteMutation = useMutation({
-    mutationFn: async (targetGroupId: string) => deleteGroup(targetGroupId),
+    mutationFn: async (targetGroupId: string) => {
+      if (!user?.id) {
+        throw new Error('Necesitas iniciar sesión para eliminar el grupo');
+      }
+      return deleteGroup({ groupId: targetGroupId, actorId: user.id });
+    },
     onSuccess: async (_data, targetGroupId) => {
       setShowDeleteConfirm(false);
       setExpenseToEdit(null);
@@ -164,6 +169,7 @@ export default function GroupDetailPageClient() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['group-detail', targetGroupId] }),
+        queryClient.invalidateQueries({ queryKey: ['activity', user?.id] }),
       ]);
       router.replace('/grupos');
     },

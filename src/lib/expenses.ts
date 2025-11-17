@@ -1,6 +1,7 @@
 import { computeShares } from '@/lib/finance';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Database } from '@/lib/database.types';
+import { logActivity } from '@/lib/activity';
 
 type Expense = Database['public']['Tables']['expenses']['Row'];
 
@@ -29,6 +30,12 @@ export type UpdateExpenseInput = {
   category?: string;
   date?: string;
   updatedBy: string;
+};
+
+export type DeleteExpenseInput = {
+  expenseId: string;
+  groupId: string;
+  deletedBy: string;
 };
 
 export async function createExpense({
@@ -65,7 +72,6 @@ export async function createExpense({
         category,
         note,
         date,
-        created_by: createdBy,
       },
     ])
     .select()
@@ -92,6 +98,19 @@ export async function createExpense({
 
   if (participantsError) throw participantsError;
 
+  await logActivity({
+    groupId,
+    actorId: createdBy,
+    action: 'expense_created',
+    payload: {
+      expenseId: expenseData.id,
+      amountMinor: totalCents,
+      currency,
+      note: note ?? null,
+      groupId,
+    },
+  });
+
   return expenseData;
 }
 
@@ -106,6 +125,7 @@ export async function updateExpense({
   note,
   category,
   date,
+  updatedBy,
 }: UpdateExpenseInput) {
   const supabase = getSupabaseClient();
   const amountBaseMinor = Math.round(totalCents * fxRate);
@@ -160,5 +180,62 @@ export async function updateExpense({
     if (insertParticipantsError) throw insertParticipantsError;
   }
 
+  await logActivity({
+    groupId,
+    actorId: updatedBy,
+    action: 'expense_updated',
+    payload: {
+      expenseId,
+      amountMinor: totalCents,
+      currency,
+      note: note ?? null,
+      groupId,
+    },
+  });
+
   return updatedExpense as Expense;
+}
+
+export async function deleteExpense({ expenseId, groupId, deletedBy }: DeleteExpenseInput) {
+  const supabase = getSupabaseClient();
+
+  const { data: existingExpense, error: fetchError } = await supabase
+    .from('expenses')
+    .select('id, amount_minor, currency, note')
+    .eq('id', expenseId)
+    .eq('group_id', groupId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!existingExpense) {
+    throw new Error('El gasto ya no existe.');
+  }
+
+  const { error: deleteParticipantsError } = await supabase
+    .from('expense_participants')
+    .delete()
+    .eq('expense_id', expenseId);
+
+  if (deleteParticipantsError) throw deleteParticipantsError;
+
+  const { error: deleteExpenseError } = await supabase
+    .from('expenses')
+    .delete()
+    .eq('id', expenseId)
+    .eq('group_id', groupId);
+
+  if (deleteExpenseError) throw deleteExpenseError;
+
+  await logActivity({
+    groupId,
+    actorId: deletedBy,
+    action: 'expense_deleted',
+    payload: {
+      expenseId,
+      amountMinor: existingExpense.amount_minor,
+      currency: existingExpense.currency ?? 'EUR',
+      note: existingExpense.note ?? null,
+      groupId,
+    },
+  });
 }

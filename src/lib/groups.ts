@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '@/lib/supabase';
 import { getGroupBalance } from '@/lib/balance';
+import { logActivity } from '@/lib/activity';
 import type { Database } from '@/lib/database.types';
 
 type GroupRow = Database['public']['Tables']['groups']['Row'];
@@ -561,11 +562,29 @@ export async function createGroup({
     throw memberError;
   }
 
+  await logActivity({
+    groupId: group.id,
+    actorId: userId,
+    action: 'group_created',
+    payload: {
+      groupName: group.name,
+      groupId: group.id,
+    },
+  });
+
   return group as GroupRow;
 }
 
-export async function deleteGroup(groupId: string): Promise<void> {
+export async function deleteGroup({ groupId, actorId }: { groupId: string; actorId: string }): Promise<void> {
   const supabase = getSupabaseClient();
+
+  const { data: groupDetails, error: groupFetchError } = await supabase
+    .from('groups')
+    .select('id, name')
+    .eq('id', groupId)
+    .maybeSingle();
+
+  if (groupFetchError) throw groupFetchError;
 
   const { data: expenseRows, error: expensesError } = await supabase
     .from('expenses')
@@ -614,6 +633,16 @@ export async function deleteGroup(groupId: string): Promise<void> {
     .eq('group_id', groupId);
 
   if (membersError) throw membersError;
+
+  await logActivity({
+    groupId,
+    actorId,
+    action: 'group_deleted',
+    payload: {
+      groupName: groupDetails?.name ?? null,
+      groupId,
+    },
+  });
 
   const { error: groupError } = await supabase
     .from('groups')

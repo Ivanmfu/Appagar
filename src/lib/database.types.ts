@@ -30,6 +30,46 @@ export interface Database {
         }
         Relationships: []
       }
+      activity_events: {
+        Row: {
+          id: string
+          group_id: string | null
+          actor_id: string | null
+          action: string
+          payload: Json | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          group_id?: string | null
+          actor_id?: string | null
+          action: string
+          payload?: Json | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          group_id?: string | null
+          actor_id?: string | null
+          action?: string
+          payload?: Json | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'activity_events_actor_id_fkey'
+            columns: ['actor_id']
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'activity_events_group_id_fkey'
+            columns: ['group_id']
+            referencedRelation: 'groups'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       groups: {
         Row: {
           id: string

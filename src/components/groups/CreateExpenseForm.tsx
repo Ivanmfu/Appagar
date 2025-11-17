@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/components/AuthGate';
 import type { GroupExpense, GroupMember } from '@/lib/groups';
-import { createExpense, updateExpense } from '@/lib/expenses';
+import { createExpense, updateExpense, deleteExpense } from '@/lib/expenses';
 import { splitEvenlyInCents } from '@/lib/money';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
@@ -238,6 +238,7 @@ export function CreateExpenseForm({
         queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] }),
         queryClient.invalidateQueries({ queryKey: ['group-expenses', groupId] }),
         queryClient.invalidateQueries({ queryKey: ['group-balance', groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['activity', user?.id] }),
       ]);
 
       if (!isEditing) {
@@ -252,6 +253,36 @@ export function CreateExpenseForm({
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : 'No se pudo registrar el gasto';
+      setError(message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      setError(null);
+      if (!user?.id) {
+        throw new Error('Necesitas iniciar sesión para eliminar un gasto');
+      }
+      if (!expense) {
+        throw new Error('No se encontró el gasto a eliminar');
+      }
+      await deleteExpense({
+        expenseId: expense.id,
+        groupId,
+        deletedBy: user.id,
+      });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['group-expenses', groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['group-balance', groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['activity', user?.id] }),
+      ]);
+      onSuccess?.();
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'No se pudo eliminar el gasto';
       setError(message);
     },
   });
@@ -449,14 +480,14 @@ export function CreateExpenseForm({
             type="button"
             className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
             onClick={onCancel}
-            disabled={mutation.isPending}
+            disabled={mutation.isPending || deleteMutation.isPending}
           >
             Cancelar
           </button>
         )}
         <button
           className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || deleteMutation.isPending}
           type="submit"
         >
           {mutation.isPending
@@ -467,6 +498,16 @@ export function CreateExpenseForm({
             ? 'Guardar cambios'
             : 'Guardar gasto'}
         </button>
+        {isEditing && expense && (
+          <button
+            type="button"
+            className="btn-danger ml-auto disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => deleteMutation.mutate()}
+            disabled={mutation.isPending || deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar gasto'}
+          </button>
+        )}
       </div>
       {showAverageShareHint && (
         <p className="text-xs text-text-secondary">

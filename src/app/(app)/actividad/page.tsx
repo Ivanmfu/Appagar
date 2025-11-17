@@ -1,10 +1,9 @@
 'use client';
 
 import { useAuth } from '@/components/AuthGate';
-import { fetchUserGroups, GroupSummary } from '@/lib/groups';
+import { fetchActivityFeed, type ActivityFeedItem } from '@/lib/activity';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { useMemo } from 'react';
 
 const CARD_CLASS = 'glass-card p-6';
 
@@ -18,26 +17,66 @@ function formatDateTime(input?: string | null) {
   }
 }
 
+function formatCurrency(minor?: number, currency: string = 'EUR') {
+  if (!minor || !Number.isFinite(minor)) return '—';
+  return new Intl.NumberFormat('es-ES', {
+    style: 'currency',
+    currency,
+  }).format(minor / 100);
+}
+
+function getActionLabel(action: ActivityFeedItem['action']) {
+  switch (action) {
+    case 'expense_created':
+      return 'Nuevo gasto';
+    case 'expense_updated':
+      return 'Gasto editado';
+    case 'expense_deleted':
+      return 'Gasto eliminado';
+    case 'group_created':
+      return 'Grupo creado';
+    case 'group_deleted':
+      return 'Grupo eliminado';
+    default:
+      return 'Actividad';
+  }
+}
+
+function describeActivity(item: ActivityFeedItem) {
+  const amount = formatCurrency(item.payload.amountMinor, item.payload.currency ?? 'EUR');
+  const hasAmount = amount !== '—';
+  const note = item.payload.note ? ` «${item.payload.note}»` : '';
+
+  switch (item.action) {
+    case 'expense_created':
+      return `${item.actorName} registró un gasto de ${amount}${note} en ${item.groupName}.`;
+    case 'expense_updated':
+      return `${item.actorName} actualizó un gasto de ${amount}${note} en ${item.groupName}.`;
+    case 'expense_deleted':
+      return `${item.actorName} eliminó ${hasAmount ? `un gasto de ${amount}` : 'un gasto'}${note} en ${item.groupName}.`;
+    case 'group_created':
+      return `${item.actorName} creó el grupo ${item.groupName}.`;
+    case 'group_deleted':
+      return `${item.actorName} eliminó el grupo ${item.payload.groupName ?? item.groupName}.`;
+    default:
+      return `${item.actorName} registró actividad en ${item.groupName}.`;
+  }
+}
+
 export default function ActivityPage() {
   const { user } = useAuth();
 
-  const groupsQuery = useQuery({
-    queryKey: ['groups', user?.id],
+  const activityQuery = useQuery({
+    queryKey: ['activity', user?.id],
     enabled: Boolean(user?.id),
     queryFn: async () => {
-      if (!user?.id) return [] as GroupSummary[];
-      return fetchUserGroups(user.id);
+      if (!user?.id) return [] as ActivityFeedItem[];
+      return fetchActivityFeed(user.id);
     },
+    staleTime: 10_000,
   });
 
-  const sortedByActivity = useMemo(() => {
-    const data = groupsQuery.data ?? [];
-    return [...data].sort((a, b) => {
-      const aTime = a.lastExpenseAt ? new Date(a.lastExpenseAt).getTime() : 0;
-      const bTime = b.lastExpenseAt ? new Date(b.lastExpenseAt).getTime() : 0;
-      return bTime - aTime;
-    });
-  }, [groupsQuery.data]);
+  const feed = activityQuery.data ?? [];
 
   return (
     <div className="space-y-6">
@@ -45,37 +84,57 @@ export default function ActivityPage() {
         <header className="space-y-2">
           <h2 className="text-lg font-semibold text-text-primary">Actividad reciente</h2>
           <p className="text-sm text-text-secondary">
-            Consulta el último movimiento registrado en cada uno de tus grupos.
+            Todas las acciones relevantes de tus grupos aparecen aquí al instante.
           </p>
         </header>
 
-        {groupsQuery.isLoading && <p className="text-sm text-text-secondary">Cargando actividad...</p>}
-        {groupsQuery.error && (
+        {activityQuery.isLoading && <p className="text-sm text-text-secondary">Cargando actividad...</p>}
+        {activityQuery.error && (
           <p className="text-sm text-danger">
-            {(groupsQuery.error as Error).message ?? 'No se pudo recuperar la actividad reciente'}
+            {(activityQuery.error as Error).message ?? 'No se pudo recuperar la actividad reciente.'}
           </p>
         )}
 
-        {sortedByActivity.length > 0 ? (
+        {feed.length > 0 ? (
           <ul className="space-y-3">
-            {sortedByActivity.map((group) => (
-              <li key={group.id} className="glass-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">{group.name}</p>
-                    <p className="text-xs text-text-secondary">Último movimiento {formatDateTime(group.lastExpenseAt)}</p>
+            {feed.map((item) => (
+              <li
+                key={item.id}
+                className="glass-list-item space-y-2 border border-white/40 bg-white/30 p-4"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-text-primary">{item.actorName}</p>
+                    <p className="text-xs text-text-secondary">{describeActivity(item)}</p>
                   </div>
-                  <Link className="text-xs font-semibold text-primary underline-offset-2 hover:text-text-primary hover:underline" href={`/grupos/detalle?id=${group.id}`}>
-                    Abrir grupo
-                  </Link>
+                  <span className="rounded-full border border-white/40 bg-white/40 px-3 py-1 text-xs font-medium text-text-secondary backdrop-blur">
+                    {getActionLabel(item.action)}
+                  </span>
                 </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-text-secondary">
+                  <span>{formatDateTime(item.createdAt)}</span>
+                  <span className="font-medium text-text-primary/80">{item.groupName}</span>
+                </div>
+                {item.payload.note && item.action !== 'group_deleted' && (
+                  <p className="text-xs italic text-text-secondary/80">“{item.payload.note}”</p>
+                )}
+                {item.groupId && (
+                  <div className="pt-2">
+                    <Link
+                      className="text-xs font-semibold text-primary underline-offset-2 hover:text-text-primary hover:underline"
+                      href={`/grupos/detalle?id=${item.groupId}`}
+                    >
+                      Ver detalles del grupo
+                    </Link>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
         ) : (
-          !groupsQuery.isLoading && (
+          !activityQuery.isLoading && (
             <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-text-secondary">
-              Todavía no hay movimientos. Registra gastos para verlos aquí.
+              Todavía no hay actividad registrada. Crea o edita gastos para empezar a verla aquí.
             </div>
           )
         )}

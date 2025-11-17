@@ -40,7 +40,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">Appagar</p>
               <h1 className="mt-2 text-3xl font-semibold text-text-primary sm:text-4xl">
-                {profile?.display_name ?? user?.email ?? 'Compañero/a'}
+                {profile?.display_name ?? profile?.email ?? user?.email ?? 'Compañero/a'}
               </h1>
               <p className="mt-1 text-sm text-text-secondary">
                 Organiza tus gastos compartidos sin perder estilo.
@@ -48,11 +48,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </div>
             <div className="flex items-center gap-3 rounded-full border border-white/40 bg-white/40 px-5 py-3 backdrop-blur-xl shadow-[0_6px_18px_rgba(0,0,0,0.08)]">
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-soft/80 text-lg font-semibold text-primary">
-                {(profile?.display_name ?? user?.email ?? 'A').slice(0, 1).toUpperCase()}
+                {(profile?.display_name ?? profile?.email ?? user?.email ?? 'A').slice(0, 1).toUpperCase()}
               </span>
               <div className="text-xs text-text-secondary">
                 <p className="font-medium text-text-primary">Sesión activa</p>
-                <p>{user?.email}</p>
+                <p>{profile?.email ?? user?.email}</p>
               </div>
             </div>
           </header>
