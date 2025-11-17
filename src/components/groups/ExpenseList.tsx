@@ -15,7 +15,7 @@ type Props = {
 
 export function ExpenseList({ expenses, baseCurrency, onSelect }: Props) {
   if (expenses.length === 0) {
-    return <p className="text-sm text-gray-500">No hay gastos registrados todavía.</p>;
+    return <p className="text-sm text-text-secondary">No hay gastos registrados todavía.</p>;
   }
 
   return (
@@ -24,7 +24,7 @@ export function ExpenseList({ expenses, baseCurrency, onSelect }: Props) {
         <li key={expense.id}>
           <button
             type="button"
-            className="w-full space-y-2 rounded-lg border border-white/10 bg-black/20 p-4 text-left transition hover:border-white/30 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            className="glass-list-item w-full space-y-2 border border-white/40 bg-white/30 p-4 text-left transition hover:bg-white/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary/40"
             onClick={() => onSelect?.(expense)}
           >
             <div className="flex flex-wrap justify-between gap-2">

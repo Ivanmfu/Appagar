@@ -44,10 +44,10 @@ export function EditExpenseModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20 px-4 py-10 backdrop-blur-sm">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-10">
       <div className="absolute inset-0" onClick={onClose} />
       <div className="relative z-10 w-full max-w-3xl">
-        <div className="space-y-6 rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 backdrop-blur-xl shadow-2xl shadow-purple-900/30">
+        <div className="space-y-6 rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto">
           <header className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-text-secondary">Editar gasto</p>
@@ -62,7 +62,7 @@ export function EditExpenseModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg text-text-primary transition hover:border-white/30 hover:bg-white/20"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/40 text-lg font-semibold text-text-primary transition hover:bg-white/60"
               aria-label="Cerrar"
             >
               ×

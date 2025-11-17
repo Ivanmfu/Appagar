@@ -200,7 +200,7 @@ export default function GroupsPageClient() {
               return (
                 <Link
                   key={group.id}
-                  className="glass-card group p-5 transition hover:-translate-y-[1px] hover:shadow-md"
+                  className="glass-card group p-5 transition hover:-translate-y-0.5 hover:shadow-xl"
                   href={`/grupos/detalle?id=${group.id}`}
                 >
                   <header className="flex items-center justify-between">
@@ -219,7 +219,7 @@ export default function GroupsPageClient() {
           </div>
         ) : (
           !groupsQuery.isLoading && (
-            <div className="rounded-2xl border border-dashed border-border-subtle bg-muted-bg/30 p-6 text-center text-sm text-text-secondary">
+            <div className="rounded-2xl border border-dashed border-border-subtle bg-white/60 p-6 text-center text-sm text-text-secondary shadow-[0_6px_18px_rgba(0,0,0,0.06)] backdrop-blur-lg">
               {hasAnyGroup
                 ? 'Ya no tienes cuentas pendientes en tus grupos activos.'
                 : 'Todavía no perteneces a ningún grupo. Crea uno nuevo y comparte el enlace con tus amigos.'}
@@ -245,7 +245,7 @@ export default function GroupsPageClient() {
             {settledGroups.map((group) => (
               <Link
                 key={group.id}
-                className="glass-card p-5 transition hover:-translate-y-[1px] hover:shadow-md"
+                className="glass-card p-5 transition hover:-translate-y-0.5 hover:shadow-xl"
                 href={`/grupos/detalle?id=${group.id}`}
               >
                 <header className="flex items-center justify-between">

@@ -10,23 +10,24 @@ module.exports = {
       colors: {
         // Colores base
         'app-bg': '#F5F7FA',
-        'text-primary': '#2A2E37',
-        'text-secondary': '#60697B',
-        'border-subtle': '#E3E6EB',
-        
-        // Colores de estado (pastel)
+        'app-bg-soft': '#E8ECF5',
+        'text-primary': '#1A1A1A',
+        'text-secondary': '#5A5A5A',
+        'border-subtle': '#DCE3F0',
+
+        // Colores de estado y acentos
         'primary': '#246BFD',
         'primary-hover': '#1D57CC',
-        'primary-soft': '#E8F1FF',
-        
-        'success': '#43A047',
-        'success-soft': '#DFF5E8',
-        
+        'primary-soft': '#DCEAFF',
+
+        'success': '#2E7D32',
+        'success-soft': '#C8F2D4',
+
         'danger': '#E57373',
-        'danger-soft': '#FCE8E8',
-        
-        'muted-bg': '#F4F5FB',
-        'input-border': '#D0D7E2',
+        'danger-soft': '#FFD3D3',
+
+        'muted-bg': '#EFF2F9',
+        'input-border': '#CCD6EB',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

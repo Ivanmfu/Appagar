@@ -44,9 +44,9 @@ export function GroupTotalsModal({ isOpen, onClose, currency, totals, memberSnap
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 text-text-primary shadow-2xl shadow-black/30">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-10">
+      <div className="absolute inset-0" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-2xl rounded-2xl border border-white/40 bg-white/70 p-6 text-text-primary shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto">
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-text-secondary">Balance del grupo</p>
@@ -55,7 +55,7 @@ export function GroupTotalsModal({ isOpen, onClose, currency, totals, memberSnap
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg transition hover:border-white/30 hover:bg-white/20"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-white/40 text-lg font-semibold text-text-primary transition hover:bg-white/60"
             aria-label="Cerrar"
           >
             ×
@@ -63,19 +63,19 @@ export function GroupTotalsModal({ isOpen, onClose, currency, totals, memberSnap
         </header>
 
         <section className="mt-6 grid gap-4 sm:grid-cols-2">
-          <article className="glass-card p-4 shadow-inner shadow-black/40">
+          <article className="glass-card p-4">
             <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Gasto total del grupo</p>
             <p className="mt-2 text-xl font-semibold text-text-primary">{formatCurrency(totals.totalGroupSpendMinor, currency)}</p>
           </article>
-          <article className="glass-card p-4 shadow-inner shadow-black/40">
+          <article className="glass-card p-4">
             <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Has pagado</p>
             <p className="mt-2 text-xl font-semibold text-text-primary">{formatCurrency(totals.totalUserPaidMinor, currency)}</p>
           </article>
-          <article className="glass-card p-4 shadow-inner shadow-black/40">
+          <article className="glass-card p-4">
             <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Tu parte</p>
             <p className="mt-2 text-xl font-semibold text-text-primary">{formatCurrency(totals.totalUserShareMinor, currency)}</p>
           </article>
-          <article className="glass-card p-4 shadow-inner shadow-black/40">
+          <article className="glass-card p-4">
             <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Saldo neto</p>
             <p className="mt-2 text-lg font-semibold text-text-primary">{describeBalance(totals.userNetMinor, currency)}</p>
           </article>
@@ -91,11 +91,11 @@ export function GroupTotalsModal({ isOpen, onClose, currency, totals, memberSnap
                     ? 'text-success'
                     : member.netMinor < 0
                       ? 'text-danger'
-                      : 'text-slate-200';
+                      : 'text-text-secondary';
                 return (
                   <li
                     key={member.userId}
-                    className="flex items-center justify-between glass-card px-4 py-3"
+                      className="glass-list-item flex items-center justify-between px-4 py-3"
                   >
                     <div>
                       <p className="font-semibold text-text-primary">{member.name}</p>

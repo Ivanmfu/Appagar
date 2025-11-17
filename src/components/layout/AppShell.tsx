@@ -27,12 +27,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <AuthGate>
-      <div className="relative min-h-screen overflow-hidden bg-app-bg text-text-primary">
-        {/* Gradiente suave de fondo */}
+      <div className="relative min-h-screen overflow-hidden text-text-primary">
+        {/* Capas de profundidad */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-blue-100/40 blur-3xl" />
-          <div className="absolute bottom-0 left-0 h-80 w-80 rounded-full bg-emerald-50/60 blur-3xl" />
-          <div className="absolute -bottom-24 right-12 h-72 w-72 rounded-full bg-purple-50/50 blur-3xl" />
+          <div className="absolute -top-48 left-1/2 h-[32rem] w-[32rem] -translate-x-1/2 rounded-full bg-primary/10 blur-[160px]" />
+          <div className="absolute bottom-[-6rem] left-[-4rem] h-[26rem] w-[26rem] rounded-full bg-success-soft/60 blur-[140px]" />
+          <div className="absolute -bottom-32 right-0 h-[28rem] w-[30rem] translate-x-1/4 rounded-full bg-primary-soft/70 blur-[150px]" />
         </div>
 
         <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 pb-28 pt-8 sm:px-6 lg:px-8">
@@ -46,8 +46,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 Organiza tus gastos compartidos sin perder estilo.
               </p>
             </div>
-            <div className="flex items-center gap-3 rounded-full border border-white/60 bg-white/70 px-4 py-2 backdrop-blur-md shadow-sm">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary">
+            <div className="flex items-center gap-3 rounded-full border border-white/40 bg-white/40 px-5 py-3 backdrop-blur-xl shadow-[0_6px_18px_rgba(0,0,0,0.08)]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-soft/80 text-lg font-semibold text-primary">
                 {(profile?.display_name ?? user?.email ?? 'A').slice(0, 1).toUpperCase()}
               </span>
               <div className="text-xs text-text-secondary">
@@ -62,17 +62,17 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </main>
         </div>
 
-        <nav className="fixed bottom-6 left-1/2 z-20 w-[clamp(18rem,90vw,28rem)] -translate-x-1/2 rounded-full border border-white/60 bg-white/70 px-3 py-2 backdrop-blur-md shadow-md">
-          <ul className="flex items-center justify-between text-xs font-medium">
+        <nav className="fixed bottom-6 left-1/2 z-20 w-[clamp(18rem,92vw,30rem)] -translate-x-1/2 rounded-full border border-white/40 bg-white/50 px-4 py-2 backdrop-blur-xl shadow-lg">
+          <ul className="flex items-center justify-between text-xs font-medium text-text-secondary">
             {navItems.map((item) => {
               const isActive = activeHref === item.href;
               return (
                 <li key={item.href} className="flex-1">
                   <Link
-                    className={`flex flex-col items-center gap-1 rounded-full px-3 py-2 transition ${
+                    className={`flex flex-col items-center gap-1 rounded-full px-3 py-2 transition-colors ${
                       isActive
-                        ? 'bg-primary text-white shadow-md'
-                        : 'text-text-secondary hover:text-text-primary hover:bg-white/60'
+                        ? 'bg-primary text-white shadow-lg'
+                        : 'text-text-secondary hover:text-text-primary'
                     }`}
                     href={item.href}
                   >
@@ -116,7 +116,7 @@ function FloatingAddExpenseTrigger() {
     <>
       <button
         aria-label="Registrar nuevo gasto"
-        className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-3xl font-semibold text-white shadow-lg shadow-primary/30 transition hover:scale-105 hover:bg-primary-hover hover:shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:right-10"
+        className="fixed bottom-28 right-6 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-3xl font-semibold text-white shadow-[0_12px_30px_rgba(36,107,253,0.35)] transition hover:scale-105 hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:right-10"
         onClick={openAddExpense}
         type="button"
       >

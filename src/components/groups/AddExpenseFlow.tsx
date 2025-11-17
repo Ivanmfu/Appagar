@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const CARD_CLASS =
-  'rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 backdrop-blur-xl shadow-2xl shadow-purple-900/30';
+  'rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto';
 
 type AddExpenseFlowProps = {
   isOpen: boolean;
@@ -99,7 +99,7 @@ export function AddExpenseFlow({ isOpen, onClose, currentGroupId }: AddExpenseFl
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20 px-4 py-10 backdrop-blur-sm">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30 px-4 py-10">
       <div className="absolute inset-0" onClick={handleClose} />
       <div className="relative z-10 w-full max-w-3xl">
         <div className={`${CARD_CLASS} space-y-6`}>
@@ -118,7 +118,7 @@ export function AddExpenseFlow({ isOpen, onClose, currentGroupId }: AddExpenseFl
               <button
                 type="button"
                 onClick={handleClose}
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg text-text-primary transition hover:border-white/30 hover:bg-white/20"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/40 text-lg font-semibold text-text-primary transition hover:bg-white/60"
                 aria-label="Cerrar"
               >
                 ×
@@ -135,7 +135,7 @@ export function AddExpenseFlow({ isOpen, onClose, currentGroupId }: AddExpenseFl
                 )}
 
                 {!groupsQuery.isLoading && (groupsQuery.data?.length ?? 0) === 0 && (
-                  <div className="space-y-3 rounded-2xl border border-dashed border-white/20 p-6 text-sm text-text-secondary">
+                    <div className="rounded-2xl border border-dashed border-border-subtle bg-white/60 p-6 text-sm text-text-secondary shadow-[0_6px_18px_rgba(0,0,0,0.06)] backdrop-blur-lg">
                     <p>No tienes grupos disponibles todavía.</p>
                     <p>Crea uno nuevo desde la pestaña Grupos para registrar gastos.</p>
                   </div>
@@ -147,7 +147,7 @@ export function AddExpenseFlow({ isOpen, onClose, currentGroupId }: AddExpenseFl
                       <li key={group.id}>
                         <button
                           type="button"
-                          className="flex w-full flex-col gap-1 rounded-2xl border border-white/10 bg-black/20 px-5 py-4 text-left text-sm text-slate-100 transition hover:border-white/30 hover:bg-white/10"
+                          className="glass-list-item flex w-full flex-col gap-1 border border-white/40 bg-white/30 px-5 py-4 text-left text-sm text-text-primary transition hover:bg-white/40"
                           onClick={() => {
                             setSelectedGroupId(group.id);
                             setStep('form');

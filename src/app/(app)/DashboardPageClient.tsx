@@ -156,7 +156,7 @@ export default function DashboardPageClient() {
             <button
               type="button"
               onClick={() => setShowIncomingModal(true)}
-              className="glass-success p-4 text-left transition hover:-translate-y-[1px] hover:shadow-md"
+              className="glass-success p-4 text-left transition hover:-translate-y-[1px]"
             >
               <p className="text-xs uppercase tracking-[0.2em] text-success/70">Te deben</p>
               <p className="mt-2 text-3xl font-semibold text-success">
@@ -167,7 +167,7 @@ export default function DashboardPageClient() {
             <button
               type="button"
               onClick={() => setShowOutgoingModal(true)}
-              className="glass-danger p-4 text-left transition hover:-translate-y-[1px] hover:shadow-md"
+              className="glass-danger p-4 text-left transition hover:-translate-y-[1px]"
             >
               <p className="text-xs uppercase tracking-[0.2em] text-danger/70">Debes</p>
               <p className="mt-2 text-3xl font-semibold text-danger">
@@ -230,7 +230,7 @@ export default function DashboardPageClient() {
               return (
                 <Link
                   key={group.id}
-                  className="glass-card group p-5 transition hover:-translate-y-[1px] hover:shadow-md"
+                  className="glass-card group p-5 transition hover:-translate-y-0.5 hover:shadow-xl"
                   href={`/grupos/detalle?id=${group.id}`}
                 >
                   <header className="flex items-center justify-between">
@@ -249,7 +249,7 @@ export default function DashboardPageClient() {
           </div>
         ) : (
           !groupsQuery.isLoading && (
-            <div className="rounded-2xl border border-dashed border-border-subtle bg-muted-bg/30 p-6 text-center text-sm text-text-secondary">
+            <div className="rounded-2xl border border-dashed border-border-subtle bg-white/60 p-6 text-center text-sm text-text-secondary shadow-[0_6px_18px_rgba(0,0,0,0.06)] backdrop-blur-lg">
               Aún no perteneces a ningún grupo. Usa el botón flotante para registrar tu primer gasto una vez que formes uno.
             </div>
           )
@@ -257,13 +257,13 @@ export default function DashboardPageClient() {
       </section>
 
       {showIncomingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-10">
           <div
             className="absolute inset-0"
             onClick={settlementMutation.isPending ? undefined : closeIncomingModal}
           />
           <div className="relative z-10 w-full max-w-2xl">
-            <div className="space-y-5 glass-card p-6 shadow-xl">
+            <div className="space-y-5 rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold text-text-primary">Personas que te deben</h2>
@@ -291,7 +291,7 @@ export default function DashboardPageClient() {
                   {incomingRelations.map((relation) => (
                     <li
                       key={`${relation.groupId}-${relation.fromUserId}-${relation.toUserId}`}
-                      className="glass-card flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                      className="glass-list-item flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                     >
                       <div>
                         <p className="text-sm font-semibold text-text-primary">{relation.counterpartyName}</p>
@@ -322,13 +322,13 @@ export default function DashboardPageClient() {
       )}
 
       {showOutgoingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-10">
           <div
             className="absolute inset-0"
             onClick={settlementMutation.isPending ? undefined : closeOutgoingModal}
           />
           <div className="relative z-10 w-full max-w-2xl">
-            <div className="space-y-5 glass-card p-6 shadow-xl">
+            <div className="space-y-5 rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-semibold text-text-primary">Personas a las que debes</h2>
@@ -356,7 +356,7 @@ export default function DashboardPageClient() {
                   {outgoingRelations.map((relation) => (
                     <li
                       key={`${relation.groupId}-${relation.fromUserId}-${relation.toUserId}`}
-                      className="glass-card flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                      className="glass-list-item flex flex-wrap items-center justify-between gap-3 px-4 py-3"
                     >
                       <div>
                         <p className="text-sm font-semibold text-text-primary">{relation.counterpartyName}</p>
@@ -387,13 +387,13 @@ export default function DashboardPageClient() {
       )}
 
       {pendingSettlement && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-10">
           <div
             className="absolute inset-0"
             onClick={settlementMutation.isPending ? undefined : () => setPendingSettlement(null)}
           />
           <div className="relative z-10 w-full max-w-lg">
-            <div className="space-y-5 glass-card p-6 shadow-xl">
+            <div className="space-y-5 rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto">
               <h2 className="text-xl font-semibold text-text-primary">¿Registrar liquidación?</h2>
               <p className="text-sm text-text-secondary">
                 {pendingSettlement.fromUserId === user?.id
@@ -416,7 +416,7 @@ export default function DashboardPageClient() {
                 </button>
                 <button
                   type="button"
-                  className="bg-success hover:bg-success/90 px-5 py-2 text-sm font-semibold text-white rounded-full shadow-md transition hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-success px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() =>
                     settlementMutation.mutate({
                       groupId: pendingSettlement.groupId,

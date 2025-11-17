@@ -297,7 +297,7 @@ export function CreateExpenseForm({
   const showAverageShareHint = splitMode === 'equal' && previewShares.length > 0;
 
   return (
-    <form className="space-y-5 text-sm text-slate-100" onSubmit={onSubmit}>
+    <form className="space-y-6 text-sm text-text-secondary" onSubmit={onSubmit}>
       <div className="space-y-1">
         <h3 className="text-base font-semibold text-text-primary">
           {isEditing ? 'Editar gasto' : 'Registrar gasto'}
@@ -315,7 +315,7 @@ export function CreateExpenseForm({
             Importe ({baseCurrency})
           </span>
           <input
-            className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-text-primary placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
+            className="input-field"
             placeholder="0,00"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
@@ -326,7 +326,7 @@ export function CreateExpenseForm({
         <label className="flex flex-col gap-2">
           <span className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">Fecha</span>
           <input
-            className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-text-primary focus:border-white/40 focus:outline-none"
+            className="input-field"
             type="date"
             value={date}
             onChange={(event) => setDate(event.target.value)}
@@ -338,7 +338,7 @@ export function CreateExpenseForm({
       <label className="flex flex-col gap-2">
         <span className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">Descripción</span>
         <input
-          className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-text-primary placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
+          className="input-field"
           placeholder="Cena del viernes"
           value={note}
           onChange={(event) => setNote(event.target.value)}
@@ -348,7 +348,7 @@ export function CreateExpenseForm({
       <label className="flex flex-col gap-2">
         <span className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">Pagado por</span>
         <select
-          className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-text-primary focus:border-white/40 focus:outline-none"
+          className="input-field"
           value={payerId}
           onChange={(event) => setPayerId(event.target.value)}
         >
@@ -365,10 +365,10 @@ export function CreateExpenseForm({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+            className={`${
               splitMode === 'equal'
-                ? 'bg-white/80 text-slate-900 shadow shadow-white/40'
-                : 'border border-white/30 bg-black/30 text-text-secondary hover:border-white/50 hover:text-text-primary'
+                ? 'btn-primary px-4 py-2 text-xs'
+                : 'btn-secondary px-4 py-2 text-xs'
             }`}
             onClick={() => setSplitMode('equal')}
           >
@@ -376,10 +376,10 @@ export function CreateExpenseForm({
           </button>
           <button
             type="button"
-            className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+            className={`${
               splitMode === 'custom'
-                ? 'bg-white/80 text-slate-900 shadow shadow-white/40'
-                : 'border border-white/30 bg-black/30 text-text-secondary hover:border-white/50 hover:text-text-primary'
+                ? 'btn-primary px-4 py-2 text-xs'
+                : 'btn-secondary px-4 py-2 text-xs'
             }`}
             onClick={() => setSplitMode('custom')}
           >
@@ -396,21 +396,19 @@ export function CreateExpenseForm({
             return (
               <label
                 key={member.userId}
-                className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 transition ${
-                  checked
-                    ? 'border-white/40 bg-white/10'
-                    : 'border-white/10 bg-black/20 hover:border-white/30 hover:bg-white/10'
+                className={`glass-list-item flex flex-col gap-3 border px-4 py-3 transition ${
+                  checked ? 'border-primary/40 bg-primary-soft/60' : 'border-white/40 bg-white/30'
                 }`}
               >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-white/30 bg-black/40 text-indigo-400 focus:ring-indigo-300"
+                        className="h-4 w-4 rounded border-input-border text-primary focus:ring-primary"
                         checked={checked}
                         onChange={() => toggleParticipant(member.userId)}
                       />
-                      <span className="text-sm text-slate-100">
+                      <span className="text-sm text-text-primary">
                         {member.displayName ?? member.email ?? 'Miembro'}
                       </span>
                     </div>
@@ -425,7 +423,7 @@ export function CreateExpenseForm({
                 </div>
                 {splitMode === 'custom' && checked && (
                   <input
-                    className="w-full rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-sm text-text-primary placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
+                    className="input-field"
                     placeholder="0,00"
                     value={customShares[member.userId] ?? ''}
                     onChange={(event) =>
@@ -449,7 +447,7 @@ export function CreateExpenseForm({
         {onCancel && (
           <button
             type="button"
-            className="rounded-full border border-white/20 bg-transparent px-6 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
             onClick={onCancel}
             disabled={mutation.isPending}
           >
@@ -457,7 +455,7 @@ export function CreateExpenseForm({
           </button>
         )}
         <button
-          className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-2 text-sm font-semibold text-text-primary shadow-lg shadow-purple-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+          className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
           disabled={mutation.isPending}
           type="submit"
         >

@@ -28,15 +28,15 @@ function getStatusBadge(status: string) {
   const normalized = status.toLowerCase();
   switch (normalized) {
     case 'accepted':
-      return { label: 'Aceptada', className: 'bg-emerald-400/20 text-success border-emerald-300/30' };
+      return { label: 'Aceptada', className: 'bg-success-soft/70 text-success border-success/40' };
     case 'revoked':
-      return { label: 'Revocada', className: 'bg-slate-500/20 text-slate-200 border-slate-300/20' };
+      return { label: 'Revocada', className: 'bg-white/30 text-text-secondary border-white/40' };
     case 'expired':
     case 'caducada':
-      return { label: 'Caducada', className: 'bg-rose-500/15 text-danger border-rose-300/30' };
+      return { label: 'Caducada', className: 'bg-danger-soft/70 text-danger border-danger/40' };
     case 'pending':
     default:
-      return { label: 'Pendiente', className: 'bg-amber-500/20 text-amber-100 border-amber-300/30' };
+      return { label: 'Pendiente', className: 'bg-primary-soft/70 text-primary border-primary/40' };
   }
 }
 
@@ -113,7 +113,7 @@ export default function FriendsPage() {
           </ul>
         ) : (
           !friendsQuery.isFetching && (
-            <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-text-secondary">
+            <div className="rounded-2xl border border-dashed border-border-subtle bg-white/60 p-6 text-center text-sm text-text-secondary shadow-[0_6px_18px_rgba(0,0,0,0.06)] backdrop-blur-lg">
               Todavía no has compartido gastos con nadie. Crea un grupo e invita a tus amigos para empezar.
             </div>
           )
@@ -129,13 +129,13 @@ export default function FriendsPage() {
         {sentInvitesQuery.isLoading && <p className="text-sm text-text-secondary">Buscando invitaciones...</p>}
 
         {sentInvitesQuery.data && sentInvitesQuery.data.length > 0 ? (
-          <ul className="space-y-3 text-sm text-slate-100">
+          <ul className="space-y-3 text-sm text-text-secondary">
             {sentInvitesQuery.data.map((invite) => {
               const badge = getStatusBadge(invite.status);
               return (
                 <li
                   key={invite.id}
-                  className="glass-card p-4 shadow-inner shadow-black/20"
+                  className="glass-card p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>

@@ -17,36 +17,33 @@ function formatDate(input?: string | null) {
   }
 }
 
-const CARD_BASE_CLASS =
-  'relative overflow-hidden rounded-3xl border border-white/15 bg-slate-900/70 p-8 shadow-xl shadow-black/40 backdrop-blur-2xl';
+const CARD_BASE_CLASS = 'relative overflow-hidden glass-card p-8 shadow-[0_18px_36px_rgba(15,23,42,0.15)]';
 
 const CARD_ACCENTS: Record<'info' | 'warn' | 'error' | 'success', string> = {
-  info: 'from-indigo-500/30 via-purple-500/15 to-blue-500/10',
-  warn: 'from-amber-500/25 via-orange-500/15 to-yellow-400/10',
-  error: 'from-rose-500/30 via-red-500/15 to-amber-500/10',
-  success: 'from-emerald-500/25 via-teal-500/15 to-cyan-500/10',
+  info: 'from-primary/15 via-primary-soft/20 to-primary/10',
+  warn: 'from-amber-400/15 via-amber-300/10 to-amber-200/5',
+  error: 'from-danger/15 via-danger-soft/20 to-danger/10',
+  success: 'from-success/15 via-success-soft/20 to-success/10',
 };
 
-const PRIMARY_BUTTON_CLASS =
-  'inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-3 text-sm font-semibold text-text-primary shadow-lg shadow-purple-500/30 transition hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-70';
+const PRIMARY_BUTTON_CLASS = 'btn-primary w-full justify-center sm:w-auto disabled:cursor-not-allowed disabled:opacity-70';
 
-const SECONDARY_BUTTON_CLASS =
-  'inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-3 text-sm font-medium text-text-primary/80 transition hover:border-white/40 hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
+const SECONDARY_BUTTON_CLASS = 'btn-secondary w-full justify-center sm:w-auto';
 
 function InviteBackdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute -top-36 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-purple-500/30 blur-3xl" />
-      <div className="absolute bottom-0 left-6 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
-      <div className="absolute -bottom-24 right-10 h-72 w-72 btn-primary bg-success hover:bg-success/90/20 blur-3xl" />
-      <div className="absolute top-20 right-0 h-60 w-60 rounded-full bg-cyan-400/15 blur-2xl" />
+      <div className="absolute -top-40 left-1/2 h-[30rem] w-[30rem] -translate-x-1/2 rounded-full bg-primary/15 blur-[160px]" />
+      <div className="absolute bottom-[-4rem] left-[-3rem] h-[24rem] w-[24rem] rounded-full bg-success-soft/60 blur-[140px]" />
+      <div className="absolute -bottom-24 right-0 h-[26rem] w-[26rem] translate-x-1/4 rounded-full bg-primary-soft/70 blur-[150px]" />
+      <div className="absolute top-32 right-16 h-[18rem] w-[18rem] rounded-full bg-white/40 blur-[120px]" />
     </div>
   );
 }
 
 function InviteLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-slate-950 px-4 py-16 text-slate-100">
+    <div className="relative flex min-h-screen items-center justify-center px-4 py-16 text-text-primary">
       <InviteBackdrop />
       <div className="relative w-full max-w-xl">{children}</div>
     </div>
@@ -138,7 +135,7 @@ function InviteContent() {
             <p className="text-sm text-text-secondary">Estamos verificando tu sesión y el token recibido.</p>
           </header>
           <div className="flex justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
           </div>
         </InviteCard>
       </InviteLayout>
@@ -160,7 +157,7 @@ function InviteContent() {
               <p className="text-sm text-text-secondary">Un momento, estamos trayendo los datos.</p>
             </header>
             <div className="flex justify-center">
-              <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
             </div>
           </InviteCard>
         </InviteLayout>
@@ -273,7 +270,7 @@ function InviteContent() {
             <p className="text-sm text-text-secondary">El enlace expira {formatDate(invite.expires_at)}</p>
           </header>
 
-          <div className="rounded-2xl border border-white/15 bg-white/5 p-5 text-sm text-text-secondary">
+          <div className="glass-list-item border border-white/40 bg-white/30 p-5 text-sm text-text-secondary">
             <dl className="space-y-3">
               <div className="flex justify-between gap-4">
                 <dt className="text-xs font-semibold uppercase tracking-[0.25em] text-text-secondary/80">Grupo</dt>
@@ -321,7 +318,7 @@ function InviteContent() {
 
 export default function InvitePage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-gray-500">Cargando invitación...</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-text-secondary">Cargando invitación...</div>}>
       <InviteContent />
     </Suspense>
   );

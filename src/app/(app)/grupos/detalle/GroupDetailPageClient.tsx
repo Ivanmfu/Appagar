@@ -250,15 +250,15 @@ export default function GroupDetailPageClient() {
           </p>
         </header>
         <div className="grid gap-3 text-xs text-text-secondary sm:grid-cols-3">
-          <div className="glass-card p-4 shadow-inner shadow-black/30">
+          <div className="glass-card p-4">
             <p className="uppercase tracking-[0.2em] text-text-secondary">Creado por</p>
             <p className="mt-1 text-sm text-text-primary/90">{creatorDisplayName}</p>
           </div>
-          <div className="glass-card p-4 shadow-inner shadow-black/30">
+          <div className="glass-card p-4">
             <p className="uppercase tracking-[0.2em] text-text-secondary">Movimientos</p>
             <p className="mt-1 text-sm text-text-primary/90">{movementCount}</p>
           </div>
-          <div className="glass-card p-4 shadow-inner shadow-black/30">
+          <div className="glass-card p-4">
             <p className="uppercase tracking-[0.2em] text-text-secondary">Miembros activos</p>
             <p className="mt-1 text-sm text-text-primary/90">{activeMembersCount}</p>
           </div>
@@ -309,8 +309,8 @@ export default function GroupDetailPageClient() {
               <li key={member.userId} className="glass-card p-4">
                 <p className="text-sm font-semibold text-text-primary">{member.displayName ?? member.email ?? 'Miembro'}</p>
                 {member.email && <p className="text-xs text-text-secondary">{member.email}</p>}
-                {member.role && <p className="text-xs text-slate-400">Rol: {member.role}</p>}
-                <p className="mt-2 text-xs text-slate-400">Desde {formatDate(member.joinedAt)}</p>
+                {member.role && <p className="text-xs text-text-secondary">Rol: {member.role}</p>}
+                <p className="mt-2 text-xs text-text-secondary">Desde {formatDate(member.joinedAt)}</p>
               </li>
             ))}
           </ul>
@@ -324,7 +324,7 @@ export default function GroupDetailPageClient() {
           <p className="text-sm text-text-secondary">Necesitas iniciar sesión para enviar invitaciones.</p>
         )}
         {pendingInvites.length > 0 && (
-          <div className="space-y-3 text-sm text-slate-100">
+          <div className="space-y-3 text-sm text-text-secondary">
             <h4 className="font-semibold text-text-primary">Invitaciones pendientes</h4>
             <ul className="grid gap-3 md:grid-cols-2">
               {pendingInvites.map((invite) => (
@@ -353,7 +353,7 @@ export default function GroupDetailPageClient() {
           )}
           <button
             type="button"
-            className="w-full rounded-full border border-red-400/40 bg-red-500/20 px-6 py-3 text-sm font-semibold text-red-200 transition hover:border-red-300 hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-danger w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
             onClick={() => setShowDeleteConfirm(true)}
             disabled={deleteMutation.isPending}
           >
@@ -372,10 +372,10 @@ export default function GroupDetailPageClient() {
       />
 
       {showDeleteConfirm && groupId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-10">
           <div className="absolute inset-0" onClick={() => (deleteMutation.isPending ? null : setShowDeleteConfirm(false))} />
           <div className="relative z-10 w-full max-w-lg">
-            <div className="space-y-5 rounded-3xl border border-white/10 bg-black/20 p-6 backdrop-blur-xl shadow-2xl shadow-black/30">
+            <div className="space-y-5 rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto">
               <h2 className="text-xl font-semibold text-text-primary">¿Eliminar el grupo?</h2>
               <p className="text-sm text-text-secondary">
                 Esta operación eliminará permanentemente todos los gastos, miembros y asentamientos asociados a este grupo. No podrás recuperarlos más adelante.
@@ -383,7 +383,7 @@ export default function GroupDetailPageClient() {
               <div className="flex flex-wrap justify-end gap-3">
                 <button
                   type="button"
-                  className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => setShowDeleteConfirm(false)}
                   disabled={deleteMutation.isPending}
                 >
@@ -391,7 +391,7 @@ export default function GroupDetailPageClient() {
                 </button>
                 <button
                   type="button"
-                  className="rounded-full bg-red-500 px-5 py-2 text-sm font-semibold text-text-primary shadow-lg shadow-red-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-danger disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={() => deleteMutation.mutate(groupId)}
                   disabled={deleteMutation.isPending}
                 >
@@ -404,10 +404,10 @@ export default function GroupDetailPageClient() {
       )}
 
       {pendingSettlement && groupId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 py-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-10">
           <div className="absolute inset-0" onClick={settlementMutation.isPending ? undefined : cancelSettlement} />
           <div className="relative z-10 w-full max-w-lg">
-            <div className="space-y-5 rounded-3xl border border-white/10 bg-black/20 p-6 backdrop-blur-xl shadow-2xl shadow-black/30">
+            <div className="space-y-5 rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto">
               <h2 className="text-xl font-semibold text-text-primary">¿Registrar liquidación?</h2>
               <p className="text-sm text-text-secondary">
                 {currentUserId === pendingSettlement.fromUserId
@@ -419,7 +419,7 @@ export default function GroupDetailPageClient() {
               <div className="flex flex-wrap justify-end gap-3">
                 <button
                   type="button"
-                  className="rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={cancelSettlement}
                   disabled={settlementMutation.isPending}
                 >
@@ -427,7 +427,7 @@ export default function GroupDetailPageClient() {
                 </button>
                 <button
                   type="button"
-                  className="btn-primary bg-success hover:bg-success/90 px-5 py-2 text-sm font-semibold text-text-primary shadow-lg shadow-emerald-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-success px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   onClick={confirmSettlement}
                   disabled={settlementMutation.isPending}
                 >

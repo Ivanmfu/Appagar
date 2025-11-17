@@ -91,16 +91,16 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
   }
 
   return (
-    <form className="space-y-3" onSubmit={onSubmit}>
+    <form className="space-y-4" onSubmit={onSubmit}>
       <div>
-        <h3 className="text-base font-semibold">Invitar miembro</h3>
-        <p className="text-xs text-gray-500">Enviaremos un enlace válido durante 48 horas.</p>
+        <h3 className="text-base font-semibold text-text-primary">Invitar miembro</h3>
+        <p className="text-xs text-text-secondary">Enviaremos un enlace válido durante 48 horas.</p>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-2 text-sm text-text-secondary">
         Email de la persona
         <input
-          className="border rounded px-3 py-2"
+          className="input-field"
           placeholder="persona@email.com"
           type="email"
           value={email}
@@ -109,10 +109,10 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
         />
       </label>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <button
-        className="bg-blue-600 text-text-primary px-4 py-2 rounded disabled:opacity-60"
+        className="btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
         disabled={mutation.isPending}
         type="submit"
       >
@@ -120,10 +120,10 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
       </button>
 
       {inviteLink && (
-        <div className="border rounded p-3 text-sm space-y-2">
-          <p className="font-medium">Invitación generada</p>
-          <p className="break-all text-gray-600">{inviteLink}</p>
-          <button className="text-blue-600 hover:underline" type="button" onClick={copyLink}>
+        <div className="glass-list-item space-y-2 p-3 text-sm">
+          <p className="font-medium text-text-primary">Invitación generada</p>
+          <p className="break-all text-text-secondary">{inviteLink}</p>
+          <button className="btn-secondary text-xs" type="button" onClick={copyLink}>
             Copiar enlace
           </button>
         </div>

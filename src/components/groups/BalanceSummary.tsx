@@ -20,13 +20,13 @@ export function BalanceSummary({ baseCurrency, members, balance }: Props) {
   return (
     <section className="space-y-4">
       <header>
-        <h3 className="text-base font-semibold">Balance del grupo</h3>
-        <p className="text-xs text-gray-500">Cálculo con la vista group_balance y simplificación de deudas.</p>
+        <h3 className="text-base font-semibold text-text-primary">Balance del grupo</h3>
+        <p className="text-xs text-text-secondary">Cálculo con la vista group_balance y simplificación de deudas.</p>
       </header>
 
-      <div className="grid gap-2 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         {balance.balances.length === 0 && (
-          <p className="text-sm text-gray-500 col-span-full">
+          <p className="col-span-full text-sm text-text-secondary">
             No hay movimientos registrados todavía.
           </p>
         )}
@@ -38,10 +38,12 @@ export function BalanceSummary({ baseCurrency, members, balance }: Props) {
           return (
             <div
               key={entry.userId}
-              className={`border rounded p-3 text-sm ${positive ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}
+              className={`glass-list-item p-4 text-sm ${
+                positive ? 'border-green-200/70 bg-success-soft/70' : 'border-red-200/70 bg-danger-soft/70'
+              }`}
             >
-              <p className="font-medium">{name}</p>
-              <p className={positive ? 'text-green-700' : 'text-red-700'}>
+              <p className="font-medium text-text-primary">{name}</p>
+              <p className={positive ? 'text-success' : 'text-danger'}>
                 {positive ? 'Recibe' : 'Debe'} {amount}
               </p>
             </div>
@@ -51,14 +53,17 @@ export function BalanceSummary({ baseCurrency, members, balance }: Props) {
 
       {balance.transfers.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-semibold">Liquidaciones sugeridas</h4>
-          <ul className="space-y-1 text-sm">
+          <h4 className="text-sm font-semibold text-text-primary">Liquidaciones sugeridas</h4>
+          <ul className="space-y-2 text-sm text-text-secondary">
             {balance.transfers.map((tx, index) => {
               const from = memberMap.get(tx.fromUserId)?.displayName ?? memberMap.get(tx.fromUserId)?.email ?? 'Alguien';
               const to = memberMap.get(tx.toUserId)?.displayName ?? memberMap.get(tx.toUserId)?.email ?? 'Alguien';
               return (
-                <li key={`${tx.fromUserId}-${tx.toUserId}-${index}`}>
-                  {from} → {to}: {formatCurrency(tx.amountCents, baseCurrency)}
+                <li key={`${tx.fromUserId}-${tx.toUserId}-${index}`} className="glass-list-item px-4 py-3">
+                  <span className="font-medium text-text-primary">{from}</span> → {to}:{' '}
+                  <span className="font-semibold text-primary">
+                    {formatCurrency(tx.amountCents, baseCurrency)}
+                  </span>
                 </li>
               );
             })}
