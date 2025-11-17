@@ -112,7 +112,7 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
-        className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-60"
+        className="bg-blue-600 text-text-primary px-4 py-2 rounded disabled:opacity-60"
         disabled={mutation.isPending}
         type="submit"
       >

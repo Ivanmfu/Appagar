@@ -125,7 +125,7 @@ export function GroupBalanceCard({
       nameMap.set(member.userId, member.displayName ?? member.email ?? 'Integrante');
     });
     return balance.balances.map((entry) => {
-      const tone = entry.netBalanceCents > 0 ? 'text-emerald-200' : entry.netBalanceCents < 0 ? 'text-rose-200' : 'text-slate-200/80';
+      const tone = entry.netBalanceCents > 0 ? 'text-success' : entry.netBalanceCents < 0 ? 'text-danger' : 'text-text-secondary';
       return {
         id: entry.userId,
         tone,
@@ -144,8 +144,8 @@ export function GroupBalanceCard({
     <div className="space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-white">Balance del grupo</h3>
-          <p className="text-xs text-slate-200/70">
+          <h3 className="text-lg font-semibold text-text-primary">Balance del grupo</h3>
+          <p className="text-xs text-text-secondary">
             Resumen financiero de {groupName} usando la vista balance y simplificación automática.
           </p>
         </div>
@@ -153,7 +153,7 @@ export function GroupBalanceCard({
           <button
             type="button"
             onClick={() => setTotalsOpen(true)}
-            className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white"
+            className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-text-primary/80 transition hover:border-white/40 hover:text-text-primary"
           >
             Totales
           </button>
@@ -161,7 +161,7 @@ export function GroupBalanceCard({
             type="button"
             onClick={handleSimplify}
             disabled={simplifyLoading}
-            className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-2 text-xs font-semibold text-text-primary shadow-lg shadow-purple-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {simplifyLoading ? 'Simplificando...' : 'Simplificar deudas'}
           </button>
@@ -169,35 +169,35 @@ export function GroupBalanceCard({
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Gasto total del grupo</p>
-          <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(totalGroupSpendMinor, baseCurrency)}</p>
+        <article className="glass-card p-4 shadow-inner shadow-black/30">
+          <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Gasto total del grupo</p>
+          <p className="mt-2 text-lg font-semibold text-text-primary">{formatCurrency(totalGroupSpendMinor, baseCurrency)}</p>
         </article>
-        <article className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Has pagado</p>
-          <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(totalUserPaidMinor, baseCurrency)}</p>
+        <article className="glass-card p-4 shadow-inner shadow-black/30">
+          <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Has pagado</p>
+          <p className="mt-2 text-lg font-semibold text-text-primary">{formatCurrency(totalUserPaidMinor, baseCurrency)}</p>
         </article>
-        <article className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Tu parte</p>
-          <p className="mt-2 text-lg font-semibold text-white">{formatCurrency(totalUserShareMinor, baseCurrency)}</p>
+        <article className="glass-card p-4 shadow-inner shadow-black/30">
+          <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Tu parte</p>
+          <p className="mt-2 text-lg font-semibold text-text-primary">{formatCurrency(totalUserShareMinor, baseCurrency)}</p>
         </article>
-        <article className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/30">
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Saldo neto</p>
-          <p className="mt-2 text-lg font-semibold text-white">{describeBalance(userNetMinor, baseCurrency)}</p>
+        <article className="glass-card p-4 shadow-inner shadow-black/30">
+          <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Saldo neto</p>
+          <p className="mt-2 text-lg font-semibold text-text-primary">{describeBalance(userNetMinor, baseCurrency)}</p>
         </article>
       </div>
 
       <section className="space-y-3">
-        <h4 className="text-sm font-semibold text-white">Relaciones de deuda</h4>
+        <h4 className="text-sm font-semibold text-text-primary">Relaciones de deuda</h4>
         {debtRelations.length > 0 ? (
-          <ul className="space-y-2 text-sm text-slate-200/80">
+          <ul className="space-y-2 text-sm text-text-secondary">
             {debtRelations.map((relation) => {
               const relationLabel = `${relation.fromName} debe ${formatCurrency(relation.amountCents, baseCurrency)} a ${relation.toName}`;
               const userInvolved = currentUserId && (currentUserId === relation.fromUserId || currentUserId === relation.toUserId);
               return (
                 <li
                   key={`${relation.fromUserId}-${relation.toUserId}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                  className="flex flex-wrap items-center justify-between gap-3 glass-card px-4 py-3"
                 >
                   <span>{relationLabel}</span>
                   {userInvolved && onSettleRequest && (
@@ -213,7 +213,7 @@ export function GroupBalanceCard({
                         })
                       }
                       disabled={settlementLoading}
-                      className="rounded-full border border-white/20 px-4 py-1 text-xs font-semibold text-white/80 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-full border border-white/20 px-4 py-1 text-xs font-semibold text-text-primary/80 transition hover:border-white/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Liquidar
                     </button>
@@ -223,19 +223,19 @@ export function GroupBalanceCard({
             })}
           </ul>
         ) : (
-          <p className="text-sm text-emerald-200/80">En este grupo, todo está en orden ✨</p>
+          <p className="text-sm text-success/80">En este grupo, todo está en orden ✨</p>
         )}
       </section>
 
       <section className="space-y-3">
-        <h4 className="text-sm font-semibold text-white">Saldo por miembro</h4>
+        <h4 className="text-sm font-semibold text-text-primary">Saldo por miembro</h4>
         {memberBalances.length === 0 ? (
-          <p className="text-sm text-slate-200/70">Todavía no hay movimientos registrados.</p>
+          <p className="text-sm text-text-secondary">Todavía no hay movimientos registrados.</p>
         ) : (
-          <ul className="space-y-2 text-sm text-slate-200/80">
+          <ul className="space-y-2 text-sm text-text-secondary">
             {memberBalances.map((entry) => (
-              <li key={entry.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                <span className="font-semibold text-white">{entry.label}</span>
+              <li key={entry.id} className="flex items-center justify-between glass-card px-4 py-3">
+                <span className="font-semibold text-text-primary">{entry.label}</span>
                 <span className={`text-xs font-semibold ${entry.tone}`}>{describeBalance(entry.net, baseCurrency)}</span>
               </li>
             ))}

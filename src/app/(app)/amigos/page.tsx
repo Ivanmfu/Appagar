@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
-const CARD_CLASS = 'rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-xl shadow-xl shadow-black/20';
+const CARD_CLASS = 'glass-card p-6';
 
 type Friend = {
   userId: string;
@@ -28,12 +28,12 @@ function getStatusBadge(status: string) {
   const normalized = status.toLowerCase();
   switch (normalized) {
     case 'accepted':
-      return { label: 'Aceptada', className: 'bg-emerald-400/20 text-emerald-200 border-emerald-300/30' };
+      return { label: 'Aceptada', className: 'bg-emerald-400/20 text-success border-emerald-300/30' };
     case 'revoked':
       return { label: 'Revocada', className: 'bg-slate-500/20 text-slate-200 border-slate-300/20' };
     case 'expired':
     case 'caducada':
-      return { label: 'Caducada', className: 'bg-rose-500/15 text-rose-200 border-rose-300/30' };
+      return { label: 'Caducada', className: 'bg-rose-500/15 text-danger border-rose-300/30' };
     case 'pending':
     default:
       return { label: 'Pendiente', className: 'bg-amber-500/20 text-amber-100 border-amber-300/30' };
@@ -94,26 +94,26 @@ export default function FriendsPage() {
     <div className="space-y-6">
       <section className={`${CARD_CLASS} space-y-4`}>
         <header className="space-y-2">
-          <h2 className="text-lg font-semibold text-white">Personas con las que compartes gastos</h2>
-          <p className="text-sm text-slate-200/80">
+          <h2 className="text-lg font-semibold text-text-primary">Personas con las que compartes gastos</h2>
+          <p className="text-sm text-text-secondary">
             La lista se genera automáticamente a partir de los miembros de tus grupos activos.
           </p>
         </header>
 
-        {friendsQuery.isFetching && <p className="text-sm text-slate-300">Actualizando contactos...</p>}
+        {friendsQuery.isFetching && <p className="text-sm text-text-secondary">Actualizando contactos...</p>}
 
         {friendsQuery.data && friendsQuery.data.length > 0 ? (
           <ul className="grid gap-3 md:grid-cols-2">
             {friendsQuery.data.map((friend) => (
-              <li key={friend.userId} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-sm font-semibold text-white">{friend.displayName ?? friend.email ?? 'Integrante'}</p>
-                {friend.email && <p className="text-xs text-slate-300">{friend.email}</p>}
+              <li key={friend.userId} className="glass-card p-4">
+                <p className="text-sm font-semibold text-text-primary">{friend.displayName ?? friend.email ?? 'Integrante'}</p>
+                {friend.email && <p className="text-xs text-text-secondary">{friend.email}</p>}
               </li>
             ))}
           </ul>
         ) : (
           !friendsQuery.isFetching && (
-            <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-slate-200/80">
+            <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-text-secondary">
               Todavía no has compartido gastos con nadie. Crea un grupo e invita a tus amigos para empezar.
             </div>
           )
@@ -122,11 +122,11 @@ export default function FriendsPage() {
 
       <section className={`${CARD_CLASS} space-y-4`}>
         <header className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Invitaciones enviadas</h2>
-          <span className="text-xs text-slate-300">{sentInvitesQuery.data?.length ?? 0} registradas</span>
+          <h2 className="text-lg font-semibold text-text-primary">Invitaciones enviadas</h2>
+          <span className="text-xs text-text-secondary">{sentInvitesQuery.data?.length ?? 0} registradas</span>
         </header>
 
-        {sentInvitesQuery.isLoading && <p className="text-sm text-slate-300">Buscando invitaciones...</p>}
+        {sentInvitesQuery.isLoading && <p className="text-sm text-text-secondary">Buscando invitaciones...</p>}
 
         {sentInvitesQuery.data && sentInvitesQuery.data.length > 0 ? (
           <ul className="space-y-3 text-sm text-slate-100">
@@ -135,12 +135,12 @@ export default function FriendsPage() {
               return (
                 <li
                   key={invite.id}
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/20"
+                  className="glass-card p-4 shadow-inner shadow-black/20"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-white">{invite.email}</p>
-                      <p className="text-xs text-slate-300">
+                      <p className="text-sm font-semibold text-text-primary">{invite.email}</p>
+                      <p className="text-xs text-text-secondary">
                         Grupo: {invite.groupName ?? 'Sin nombre'} · Enviada {formatDate(invite.createdAt)}
                       </p>
                     </div>
@@ -148,10 +148,10 @@ export default function FriendsPage() {
                       {badge.label}
                     </span>
                   </div>
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-text-secondary">
                     <p>Caduca {formatDate(invite.expiresAt)}</p>
                     <Link
-                      className="font-semibold text-indigo-200 underline-offset-2 hover:text-white hover:underline"
+                      className="font-semibold text-primary underline-offset-2 hover:text-text-primary hover:underline"
                       href={`/invite?token=${invite.token}`}
                     >
                       Ver invitación
@@ -163,7 +163,7 @@ export default function FriendsPage() {
           </ul>
         ) : (
           !sentInvitesQuery.isLoading && (
-            <p className="text-sm text-slate-200/80">Todavía no has enviado invitaciones desde Appagar.</p>
+            <p className="text-sm text-text-secondary">Todavía no has enviado invitaciones desde Appagar.</p>
           )
         )}
       </section>

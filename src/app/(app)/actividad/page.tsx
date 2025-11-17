@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
-const CARD_CLASS = 'rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-xl shadow-xl shadow-black/20';
+const CARD_CLASS = 'glass-card p-6';
 
 function formatDateTime(input?: string | null) {
   if (!input) return '—';
@@ -43,15 +43,15 @@ export default function ActivityPage() {
     <div className="space-y-6">
       <section className={`${CARD_CLASS} space-y-4`}>
         <header className="space-y-2">
-          <h2 className="text-lg font-semibold text-white">Actividad reciente</h2>
-          <p className="text-sm text-slate-200/80">
+          <h2 className="text-lg font-semibold text-text-primary">Actividad reciente</h2>
+          <p className="text-sm text-text-secondary">
             Consulta el último movimiento registrado en cada uno de tus grupos.
           </p>
         </header>
 
-        {groupsQuery.isLoading && <p className="text-sm text-slate-300">Cargando actividad...</p>}
+        {groupsQuery.isLoading && <p className="text-sm text-text-secondary">Cargando actividad...</p>}
         {groupsQuery.error && (
-          <p className="text-sm text-red-300">
+          <p className="text-sm text-danger">
             {(groupsQuery.error as Error).message ?? 'No se pudo recuperar la actividad reciente'}
           </p>
         )}
@@ -59,13 +59,13 @@ export default function ActivityPage() {
         {sortedByActivity.length > 0 ? (
           <ul className="space-y-3">
             {sortedByActivity.map((group) => (
-              <li key={group.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <li key={group.id} className="glass-card p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-white">{group.name}</p>
-                    <p className="text-xs text-slate-300">Último movimiento {formatDateTime(group.lastExpenseAt)}</p>
+                    <p className="text-sm font-semibold text-text-primary">{group.name}</p>
+                    <p className="text-xs text-text-secondary">Último movimiento {formatDateTime(group.lastExpenseAt)}</p>
                   </div>
-                  <Link className="text-xs font-semibold text-indigo-200 underline-offset-2 hover:text-white hover:underline" href={`/grupos/detalle?id=${group.id}`}>
+                  <Link className="text-xs font-semibold text-primary underline-offset-2 hover:text-text-primary hover:underline" href={`/grupos/detalle?id=${group.id}`}>
                     Abrir grupo
                   </Link>
                 </div>
@@ -74,7 +74,7 @@ export default function ActivityPage() {
           </ul>
         ) : (
           !groupsQuery.isLoading && (
-            <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-slate-200/80">
+            <div className="rounded-2xl border border-dashed border-white/20 p-6 text-center text-sm text-text-secondary">
               Todavía no hay movimientos. Registra gastos para verlos aquí.
             </div>
           )

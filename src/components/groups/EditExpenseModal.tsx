@@ -44,17 +44,17 @@ export function EditExpenseModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 px-4 py-10 backdrop-blur">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/20 px-4 py-10 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} />
       <div className="relative z-10 w-full max-w-3xl">
         <div className="space-y-6 rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 backdrop-blur-xl shadow-2xl shadow-purple-900/30">
           <header className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-300">Editar gasto</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-text-secondary">Editar gasto</p>
+              <h2 className="mt-2 text-2xl font-semibold text-text-primary">
                 {expense.note && expense.note.trim().length > 0 ? expense.note : 'Gasto sin descripción'}
               </h2>
-              <p className="mt-1 text-xs text-slate-200/80">
+              <p className="mt-1 text-xs text-text-secondary">
                 Registrado el {formatDateLabel(expense.date ?? expense.createdAt)} · Pagado por{' '}
                 {expense.payerName ?? 'alguien del grupo'}
               </p>
@@ -62,7 +62,7 @@ export function EditExpenseModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg text-white transition hover:border-white/30 hover:bg-white/20"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-lg text-text-primary transition hover:border-white/30 hover:bg-white/20"
               aria-label="Cerrar"
             >
               ×

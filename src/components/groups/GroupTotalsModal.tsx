@@ -45,11 +45,11 @@ export function GroupTotalsModal({ isOpen, onClose, currency, totals, memberSnap
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-10">
-      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-2xl rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 text-white shadow-2xl shadow-black/30">
+      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-2xl rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-6 text-text-primary shadow-2xl shadow-black/30">
         <header className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-300">Balance del grupo</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-text-secondary">Balance del grupo</p>
             <h3 className="mt-2 text-xl font-semibold">Totales detallados</h3>
           </div>
           <button
@@ -63,44 +63,44 @@ export function GroupTotalsModal({ isOpen, onClose, currency, totals, memberSnap
         </header>
 
         <section className="mt-6 grid gap-4 sm:grid-cols-2">
-          <article className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/40">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Gasto total del grupo</p>
-            <p className="mt-2 text-xl font-semibold text-white">{formatCurrency(totals.totalGroupSpendMinor, currency)}</p>
+          <article className="glass-card p-4 shadow-inner shadow-black/40">
+            <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Gasto total del grupo</p>
+            <p className="mt-2 text-xl font-semibold text-text-primary">{formatCurrency(totals.totalGroupSpendMinor, currency)}</p>
           </article>
-          <article className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/40">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Has pagado</p>
-            <p className="mt-2 text-xl font-semibold text-white">{formatCurrency(totals.totalUserPaidMinor, currency)}</p>
+          <article className="glass-card p-4 shadow-inner shadow-black/40">
+            <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Has pagado</p>
+            <p className="mt-2 text-xl font-semibold text-text-primary">{formatCurrency(totals.totalUserPaidMinor, currency)}</p>
           </article>
-          <article className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/40">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Tu parte</p>
-            <p className="mt-2 text-xl font-semibold text-white">{formatCurrency(totals.totalUserShareMinor, currency)}</p>
+          <article className="glass-card p-4 shadow-inner shadow-black/40">
+            <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Tu parte</p>
+            <p className="mt-2 text-xl font-semibold text-text-primary">{formatCurrency(totals.totalUserShareMinor, currency)}</p>
           </article>
-          <article className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner shadow-black/40">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-300">Saldo neto</p>
-            <p className="mt-2 text-lg font-semibold text-white">{describeBalance(totals.userNetMinor, currency)}</p>
+          <article className="glass-card p-4 shadow-inner shadow-black/40">
+            <p className="text-xs uppercase tracking-[0.25em] text-text-secondary">Saldo neto</p>
+            <p className="mt-2 text-lg font-semibold text-text-primary">{describeBalance(totals.userNetMinor, currency)}</p>
           </article>
         </section>
 
         {orderedMembers.length > 0 && (
           <section className="mt-6 space-y-3">
-            <h4 className="text-sm font-semibold text-white/90">Saldos por miembro</h4>
-            <ul className="space-y-2 text-sm text-slate-200/80">
+            <h4 className="text-sm font-semibold text-text-primary/90">Saldos por miembro</h4>
+            <ul className="space-y-2 text-sm text-text-secondary">
               {orderedMembers.map((member) => {
                 const tone =
                   member.netMinor > 0
-                    ? 'text-emerald-200'
+                    ? 'text-success'
                     : member.netMinor < 0
-                      ? 'text-rose-200'
+                      ? 'text-danger'
                       : 'text-slate-200';
                 return (
                   <li
                     key={member.userId}
-                    className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                    className="flex items-center justify-between glass-card px-4 py-3"
                   >
                     <div>
-                      <p className="font-semibold text-white">{member.name}</p>
+                      <p className="font-semibold text-text-primary">{member.name}</p>
                       {(member.paidMinor !== undefined || member.shareMinor !== undefined) && (
-                        <p className="text-xs text-slate-300">
+                        <p className="text-xs text-text-secondary">
                           Ha pagado {formatCurrency(member.paidMinor ?? 0, currency)} · Su parte {formatCurrency(member.shareMinor ?? 0, currency)}
                         </p>
                       )}

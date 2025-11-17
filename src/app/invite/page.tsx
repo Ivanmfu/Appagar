@@ -28,17 +28,17 @@ const CARD_ACCENTS: Record<'info' | 'warn' | 'error' | 'success', string> = {
 };
 
 const PRIMARY_BUTTON_CLASS =
-  'inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-70';
+  'inline-flex items-center justify-center rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-5 py-3 text-sm font-semibold text-text-primary shadow-lg shadow-purple-500/30 transition hover:scale-[1.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-70';
 
 const SECONDARY_BUTTON_CLASS =
-  'inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-3 text-sm font-medium text-white/80 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
+  'inline-flex items-center justify-center rounded-full border border-white/20 px-5 py-3 text-sm font-medium text-text-primary/80 transition hover:border-white/40 hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
 
 function InviteBackdrop() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="absolute -top-36 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-purple-500/30 blur-3xl" />
       <div className="absolute bottom-0 left-6 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
-      <div className="absolute -bottom-24 right-10 h-72 w-72 rounded-full bg-emerald-500/20 blur-3xl" />
+      <div className="absolute -bottom-24 right-10 h-72 w-72 btn-primary bg-success hover:bg-success/90/20 blur-3xl" />
       <div className="absolute top-20 right-0 h-60 w-60 rounded-full bg-cyan-400/15 blur-2xl" />
     </div>
   );
@@ -113,9 +113,9 @@ function InviteContent() {
         <InviteLayout>
           <InviteCard accent="error">
             <header className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-200/70">Enlace no válido</p>
-              <h1 className="text-3xl font-semibold text-white">Invitación inválida</h1>
-              <p className="text-sm text-slate-200/80">Necesitas acceder mediante un enlace con token válido.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">Enlace no válido</p>
+              <h1 className="text-3xl font-semibold text-text-primary">Invitación inválida</h1>
+              <p className="text-sm text-text-secondary">Necesitas acceder mediante un enlace con token válido.</p>
             </header>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link className={SECONDARY_BUTTON_CLASS} href="/">
@@ -133,9 +133,9 @@ function InviteContent() {
       <InviteLayout>
         <InviteCard accent="info">
           <header className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-200/70">Cargando</p>
-            <h1 className="text-2xl font-semibold text-white">Comprobando invitación...</h1>
-            <p className="text-sm text-slate-200/80">Estamos verificando tu sesión y el token recibido.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">Cargando</p>
+            <h1 className="text-2xl font-semibold text-text-primary">Comprobando invitación...</h1>
+            <p className="text-sm text-text-secondary">Estamos verificando tu sesión y el token recibido.</p>
           </header>
           <div className="flex justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -155,9 +155,9 @@ function InviteContent() {
         <InviteLayout>
           <InviteCard accent="info">
             <header className="space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-200/70">Cargando</p>
-              <h1 className="text-2xl font-semibold text-white">Buscando tu invitación</h1>
-              <p className="text-sm text-slate-200/80">Un momento, estamos trayendo los datos.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">Cargando</p>
+              <h1 className="text-2xl font-semibold text-text-primary">Buscando tu invitación</h1>
+              <p className="text-sm text-text-secondary">Un momento, estamos trayendo los datos.</p>
             </header>
             <div className="flex justify-center">
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -174,9 +174,9 @@ function InviteContent() {
         <InviteLayout>
           <InviteCard accent="error">
             <header className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-200/70">No disponible</p>
-              <h1 className="text-3xl font-semibold text-white">No se pudo cargar la invitación</h1>
-              <p className="text-sm text-slate-200/80">
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">No disponible</p>
+              <h1 className="text-3xl font-semibold text-text-primary">No se pudo cargar la invitación</h1>
+              <p className="text-sm text-text-secondary">
                 {(inviteQuery.error as Error).message ?? 'Inténtalo de nuevo más tarde.'}
               </p>
             </header>
@@ -199,9 +199,9 @@ function InviteContent() {
         <InviteLayout>
           <InviteCard accent="error">
             <header className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-200/70">No encontrado</p>
-              <h1 className="text-3xl font-semibold text-white">Invitación no encontrada</h1>
-              <p className="text-sm text-slate-200/80">Puede que haya caducado o ya haya sido utilizada.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">No encontrado</p>
+              <h1 className="text-3xl font-semibold text-text-primary">Invitación no encontrada</h1>
+              <p className="text-sm text-text-secondary">Puede que haya caducado o ya haya sido utilizada.</p>
             </header>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link className={SECONDARY_BUTTON_CLASS} href="/">
@@ -220,9 +220,9 @@ function InviteContent() {
         <InviteLayout>
           <InviteCard accent="warn">
             <header className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-200/70">Invitación cerrada</p>
-              <h1 className="text-3xl font-semibold text-white">Esta invitación ya no está activa</h1>
-              <p className="text-sm text-slate-200/80">Puedes revisar el grupo para confirmar si ya formas parte.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">Invitación cerrada</p>
+              <h1 className="text-3xl font-semibold text-text-primary">Esta invitación ya no está activa</h1>
+              <p className="text-sm text-text-secondary">Puedes revisar el grupo para confirmar si ya formas parte.</p>
             </header>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link className={PRIMARY_BUTTON_CLASS} href={`/grupos/detalle?id=${invite.group_id}`}>
@@ -244,9 +244,9 @@ function InviteContent() {
         <InviteLayout>
           <InviteCard accent="warn">
             <header className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-200/70">Invitación expirada</p>
-              <h1 className="text-3xl font-semibold text-white">Necesitas un enlace nuevo</h1>
-              <p className="text-sm text-slate-200/80">Solicita otra invitación al propietario del grupo.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">Invitación expirada</p>
+              <h1 className="text-3xl font-semibold text-text-primary">Necesitas un enlace nuevo</h1>
+              <p className="text-sm text-text-secondary">Solicita otra invitación al propietario del grupo.</p>
             </header>
             <div className="flex flex-col gap-3 sm:flex-row">
               <Link className={SECONDARY_BUTTON_CLASS} href="/">
@@ -264,31 +264,31 @@ function InviteContent() {
       <InviteLayout>
         <InviteCard accent="info">
           <header className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-200/70">
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">
               Invitación para {invite.email}
             </p>
-            <h1 className="text-3xl font-semibold text-white">
+            <h1 className="text-3xl font-semibold text-text-primary">
               Únete a {groupQuery.data?.name ?? 'tu próximo grupo'}
             </h1>
-            <p className="text-sm text-slate-200/80">El enlace expira {formatDate(invite.expires_at)}</p>
+            <p className="text-sm text-text-secondary">El enlace expira {formatDate(invite.expires_at)}</p>
           </header>
 
-          <div className="rounded-2xl border border-white/15 bg-white/5 p-5 text-sm text-slate-200/80">
+          <div className="rounded-2xl border border-white/15 bg-white/5 p-5 text-sm text-text-secondary">
             <dl className="space-y-3">
               <div className="flex justify-between gap-4">
-                <dt className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-300/80">Grupo</dt>
-                <dd className="text-sm font-medium text-white">
+                <dt className="text-xs font-semibold uppercase tracking-[0.25em] text-text-secondary/80">Grupo</dt>
+                <dd className="text-sm font-medium text-text-primary">
                   {groupQuery.data?.name ?? (groupQuery.isLoading ? 'Cargando…' : 'Grupo privado')}
                 </dd>
               </div>
               <div className="flex justify-between gap-4">
-                <dt className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-300/80">Estado</dt>
-                <dd className="text-sm font-medium text-emerald-200">Disponible</dd>
+                <dt className="text-xs font-semibold uppercase tracking-[0.25em] text-text-secondary/80">Estado</dt>
+                <dd className="text-sm font-medium text-success">Disponible</dd>
               </div>
               {groupQuery.data?.base_currency && (
                 <div className="flex justify-between gap-4">
-                  <dt className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-300/80">Divisa base</dt>
-                  <dd className="text-sm font-medium text-white">{groupQuery.data.base_currency}</dd>
+                  <dt className="text-xs font-semibold uppercase tracking-[0.25em] text-text-secondary/80">Divisa base</dt>
+                  <dd className="text-sm font-medium text-text-primary">{groupQuery.data.base_currency}</dd>
                 </div>
               )}
             </dl>
@@ -309,7 +309,7 @@ function InviteContent() {
           </div>
 
           {acceptMutation.isError && (
-            <p className="text-sm text-rose-200">
+            <p className="text-sm text-danger">
               {(acceptMutation.error as Error).message ?? 'No se pudo aceptar la invitación'}
             </p>
           )}

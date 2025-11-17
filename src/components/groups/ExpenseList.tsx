@@ -29,22 +29,22 @@ export function ExpenseList({ expenses, baseCurrency, onSelect }: Props) {
           >
             <div className="flex flex-wrap justify-between gap-2">
               <div>
-                <p className="text-sm text-slate-300">
+                <p className="text-sm text-text-secondary">
                   {expense.date ? new Date(expense.date).toLocaleDateString() : 'Sin fecha'}
                 </p>
-                {expense.note && <p className="text-sm font-semibold text-white">{expense.note}</p>}
+                {expense.note && <p className="text-sm font-semibold text-text-primary">{expense.note}</p>}
               </div>
-              <p className="text-base font-semibold text-white">
+              <p className="text-base font-semibold text-text-primary">
                 {formatCurrency(expense.amountMinor, expense.currency || baseCurrency)}
               </p>
             </div>
 
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-text-secondary">
               Pagado por {expense.payerName ?? 'Alguien'}
             </p>
 
-            <div className="text-xs text-slate-300">
-              <span className="font-semibold text-white/90">Participantes:</span>{' '}
+            <div className="text-xs text-text-secondary">
+              <span className="font-semibold text-text-primary/90">Participantes:</span>{' '}
               {expense.participants.length > 0
                 ? expense.participants
                     .map((participant) => participant.displayName ?? participant.email ?? 'Miembro')

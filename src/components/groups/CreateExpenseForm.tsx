@@ -299,10 +299,10 @@ export function CreateExpenseForm({
   return (
     <form className="space-y-5 text-sm text-slate-100" onSubmit={onSubmit}>
       <div className="space-y-1">
-        <h3 className="text-base font-semibold text-white">
+        <h3 className="text-base font-semibold text-text-primary">
           {isEditing ? 'Editar gasto' : 'Registrar gasto'}
         </h3>
-        <p className="text-xs text-slate-300">
+        <p className="text-xs text-text-secondary">
           {isEditing
             ? 'Actualiza los participantes, el importe o quién pagó este gasto.'
             : 'Selecciona quién participa y cómo quieres repartir el importe.'}
@@ -311,11 +311,11 @@ export function CreateExpenseForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-200/80">
+          <span className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">
             Importe ({baseCurrency})
           </span>
           <input
-            className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
+            className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-text-primary placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
             placeholder="0,00"
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
@@ -324,9 +324,9 @@ export function CreateExpenseForm({
           />
         </label>
         <label className="flex flex-col gap-2">
-          <span className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-200/80">Fecha</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">Fecha</span>
           <input
-            className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-white focus:border-white/40 focus:outline-none"
+            className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-text-primary focus:border-white/40 focus:outline-none"
             type="date"
             value={date}
             onChange={(event) => setDate(event.target.value)}
@@ -336,9 +336,9 @@ export function CreateExpenseForm({
       </div>
 
       <label className="flex flex-col gap-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-200/80">Descripción</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">Descripción</span>
         <input
-          className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
+          className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-text-primary placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
           placeholder="Cena del viernes"
           value={note}
           onChange={(event) => setNote(event.target.value)}
@@ -346,9 +346,9 @@ export function CreateExpenseForm({
       </label>
 
       <label className="flex flex-col gap-2">
-        <span className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-200/80">Pagado por</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">Pagado por</span>
         <select
-          className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-white focus:border-white/40 focus:outline-none"
+          className="rounded-xl border border-white/20 bg-black/30 px-4 py-3 text-sm text-text-primary focus:border-white/40 focus:outline-none"
           value={payerId}
           onChange={(event) => setPayerId(event.target.value)}
         >
@@ -361,14 +361,14 @@ export function CreateExpenseForm({
       </label>
 
       <fieldset className="space-y-3">
-        <legend className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-200/80">Tipo de reparto</legend>
+        <legend className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">Tipo de reparto</legend>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
               splitMode === 'equal'
                 ? 'bg-white/80 text-slate-900 shadow shadow-white/40'
-                : 'border border-white/30 bg-black/30 text-slate-200/80 hover:border-white/50 hover:text-white'
+                : 'border border-white/30 bg-black/30 text-text-secondary hover:border-white/50 hover:text-text-primary'
             }`}
             onClick={() => setSplitMode('equal')}
           >
@@ -379,7 +379,7 @@ export function CreateExpenseForm({
             className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
               splitMode === 'custom'
                 ? 'bg-white/80 text-slate-900 shadow shadow-white/40'
-                : 'border border-white/30 bg-black/30 text-slate-200/80 hover:border-white/50 hover:text-white'
+                : 'border border-white/30 bg-black/30 text-text-secondary hover:border-white/50 hover:text-text-primary'
             }`}
             onClick={() => setSplitMode('custom')}
           >
@@ -389,7 +389,7 @@ export function CreateExpenseForm({
       </fieldset>
 
       <fieldset className="space-y-3">
-        <legend className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-200/80">Participantes</legend>
+        <legend className="text-xs font-semibold uppercase tracking-[0.15em] text-text-secondary">Participantes</legend>
         <div className="grid gap-3 md:grid-cols-2">
           {members.map((member) => {
             const checked = participantIds.includes(member.userId);
@@ -415,7 +415,7 @@ export function CreateExpenseForm({
                       </span>
                     </div>
                   {checked && previewShares.length > 0 && (
-                    <span className="text-xs text-slate-300">
+                    <span className="text-xs text-text-secondary">
                       {formatCurrency(
                         previewShares.find((share) => share.userId === member.userId)?.share ?? 0,
                         baseCurrency
@@ -425,7 +425,7 @@ export function CreateExpenseForm({
                 </div>
                 {splitMode === 'custom' && checked && (
                   <input
-                    className="w-full rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
+                    className="w-full rounded-xl border border-white/20 bg-black/40 px-3 py-2 text-sm text-text-primary placeholder:text-slate-400 focus:border-white/40 focus:outline-none"
                     placeholder="0,00"
                     value={customShares[member.userId] ?? ''}
                     onChange={(event) =>
@@ -443,13 +443,13 @@ export function CreateExpenseForm({
         </div>
       </fieldset>
 
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
       <div className="flex flex-wrap items-center gap-3">
         {onCancel && (
           <button
             type="button"
-            className="rounded-full border border-white/20 bg-transparent px-6 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full border border-white/20 bg-transparent px-6 py-2 text-sm font-semibold text-slate-200 transition hover:border-white/40 hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-60"
             onClick={onCancel}
             disabled={mutation.isPending}
           >
@@ -457,7 +457,7 @@ export function CreateExpenseForm({
           </button>
         )}
         <button
-          className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-purple-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-6 py-2 text-sm font-semibold text-text-primary shadow-lg shadow-purple-500/30 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={mutation.isPending}
           type="submit"
         >
@@ -471,7 +471,7 @@ export function CreateExpenseForm({
         </button>
       </div>
       {showAverageShareHint && (
-        <p className="text-xs text-slate-300">
+        <p className="text-xs text-text-secondary">
           Cada participante aporta aproximadamente {formatCurrency(previewShares[0].share, baseCurrency)}
         </p>
       )}
