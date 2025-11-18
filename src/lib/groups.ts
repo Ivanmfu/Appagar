@@ -11,6 +11,8 @@ type ExpenseParticipantRow = Database['public']['Tables']['expense_participants'
 
 type Nullable<T> = T | null;
 
+export type GroupTypeValue = 'trip' | 'home' | 'couple' | 'other';
+
 export type GroupSummary = {
   id: string;
   name: string;
@@ -266,7 +268,7 @@ export async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
 
   const { data: group, error: groupError } = await supabase
     .from('groups')
-    .select('id, name, base_currency, created_at, created_by')
+    .select('id, name, base_currency, created_at, created_by, group_type, start_date, end_date, description')
     .eq('id', groupId)
     .maybeSingle();
 
@@ -591,6 +593,43 @@ export async function updateGroupName(groupId: string, newName: string) {
     .update({ name: normalizedName })
     .eq('id', groupId)
     .select('id, name, base_currency, created_at, created_by')
+    .single();
+
+  if (error) throw error;
+
+  return data as GroupRow;
+}
+
+export async function updateGroupDetails(groupId: string, details: {
+  name: string;
+  groupType: GroupTypeValue | null;
+  startDate: string | null;
+  endDate: string | null;
+  description: string | null;
+}) {
+  if (!groupId) {
+    throw new Error('Falta el identificador del grupo');
+  }
+
+  const normalizedName = details.name.trim();
+  if (!normalizedName) {
+    throw new Error('Introduce un nombre para el grupo');
+  }
+
+  const supabase = getSupabaseClient();
+  const payload = {
+    name: normalizedName,
+    group_type: details.groupType ?? null,
+    start_date: details.startDate ?? null,
+    end_date: details.endDate ?? null,
+    description: details.description?.trim() ? details.description.trim() : null,
+  } satisfies Partial<GroupRow>;
+
+  const { data, error } = await supabase
+    .from('groups')
+    .update(payload)
+    .eq('id', groupId)
+    .select('id, name, base_currency, created_at, created_by, group_type, start_date, end_date, description')
     .single();
 
   if (error) throw error;

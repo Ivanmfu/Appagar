@@ -3,9 +3,8 @@
 import { useAuth } from '@/components/AuthGate';
 import { GroupBalanceCard } from '@/components/groups/GroupBalanceCard';
 import { ExpenseList } from '@/components/groups/ExpenseList';
-import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
 import { EditExpenseModal } from '@/components/groups/EditExpenseModal';
-import { deleteGroup, fetchGroupDetail, updateGroupName } from '@/lib/groups';
+import { fetchGroupDetail } from '@/lib/groups';
 import { simplifyGroupDebts } from '@/lib/balance';
 import { settleGroupDebt } from '@/lib/settlements';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,6 +39,13 @@ type SettlementPrompt = {
   toName: string;
 };
 
+type SettlementMutationInput = {
+  groupId: string;
+  fromUserId: string;
+  toUserId: string;
+  amountCents: number;
+};
+
 export default function GroupDetailPageClient() {
   const { user } = useAuth();
   const router = useRouter();
@@ -48,10 +54,7 @@ export default function GroupDetailPageClient() {
   const [groupId, setGroupId] = useState<string | null>(null);
   const [expenseToEdit, setExpenseToEdit] = useState<GroupExpense | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingSettlement, setPendingSettlement] = useState<SettlementPrompt | null>(null);
-  const [nameInput, setNameInput] = useState('');
-  const [nameFeedback, setNameFeedback] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     const id = searchParams?.get('id');
@@ -73,44 +76,34 @@ export default function GroupDetailPageClient() {
   });
 
   const simplifyMutation = useMutation({
-    mutationFn: async (targetGroupId: string) => simplifyGroupDebts(targetGroupId),
-    onSuccess: async (_data, targetGroupId) => {
+    mutationFn: (targetGroupId: string) => simplifyGroupDebts(targetGroupId),
+    onSuccess: async () => {
+      if (!groupId) return;
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['group-detail', targetGroupId] }),
+        queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] }),
         queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
       ]);
     },
   });
 
-  const handleSimplify = useCallback(() => {
-    if (!groupId) return;
-    simplifyMutation.mutate(groupId);
-  }, [groupId, simplifyMutation]);
-
-  const currentUserId = user?.id ?? null;
-
   const settlementMutation = useMutation({
-    mutationFn: async ({
+    mutationFn: ({
       groupId: targetGroupId,
       fromUserId,
       toUserId,
       amountCents,
-    }: {
-      groupId: string;
-      fromUserId: string;
-      toUserId: string;
-      amountCents: number;
-    }) =>
+    }: SettlementMutationInput) =>
       settleGroupDebt({
         groupId: targetGroupId,
         fromUserId,
         toUserId,
         amountMinor: amountCents,
       }),
-    onSuccess: async (_result, variables) => {
+    onSuccess: async () => {
       setPendingSettlement(null);
+      if (!groupId) return;
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['group-detail', variables.groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] }),
         queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
       ]);
     },
@@ -147,6 +140,11 @@ export default function GroupDetailPageClient() {
     setPendingSettlement(null);
   }, [settlementMutation]);
 
+  const handleSimplify = useCallback(() => {
+    if (!groupId || simplifyMutation.isPending) return;
+    simplifyMutation.mutate(groupId);
+  }, [groupId, simplifyMutation]);
+
   const handleExpenseSelect = useCallback((expense: GroupExpense) => {
     setExpenseToEdit(expense);
     setIsEditOpen(true);
@@ -157,74 +155,12 @@ export default function GroupDetailPageClient() {
     setExpenseToEdit(null);
   }, []);
 
-  const deleteMutation = useMutation({
-    mutationFn: async (targetGroupId: string) => {
-      if (!user?.id) {
-        throw new Error('Necesitas iniciar sesión para eliminar el grupo');
-      }
-      return deleteGroup({ groupId: targetGroupId, actorId: user.id });
-    },
-    onSuccess: async (_data, targetGroupId) => {
-      setShowDeleteConfirm(false);
-      setExpenseToEdit(null);
-      setIsEditOpen(false);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['group-detail', targetGroupId] }),
-        queryClient.invalidateQueries({ queryKey: ['activity', user?.id] }),
-      ]);
-      router.replace('/grupos');
-    },
-  });
-
-  const updateNameMutation = useMutation({
-    mutationFn: async (nextName: string) => {
-      if (!groupId) {
-        throw new Error('Grupo no disponible');
-      }
-      return updateGroupName(groupId, nextName);
-    },
-    onSuccess: async (updatedGroup) => {
-      setNameFeedback({ status: 'success', message: 'Nombre actualizado correctamente.' });
-      setNameInput(updatedGroup.name);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] }),
-        queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
-      ]);
-    },
-    onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'No se pudo actualizar el nombre del grupo.';
-      setNameFeedback({ status: 'error', message });
-    },
-  });
-
   const creatorDisplayName = useMemo(() => {
     const detail = detailQuery.data;
     if (!detail) return null;
     const owner = detail.members.find((member) => member.userId === detail.group.created_by);
     return owner?.displayName ?? owner?.email ?? detail.group.created_by;
   }, [detailQuery.data]);
-
-  const currentMemberRole = useMemo(() => {
-    const detail = detailQuery.data;
-    if (!detail || !user?.id) return null;
-    return detail.members.find((member) => member.userId === user.id)?.role ?? null;
-  }, [detailQuery.data, user?.id]);
-
-  const pendingInvites = useMemo(() => {
-    const invites = detailQuery.data?.invites ?? [];
-    return invites.filter((invite) => {
-      if (invite.status !== 'pending') return false;
-      if (!invite.expiresAt) return true;
-      return new Date(invite.expiresAt) > new Date();
-    });
-  }, [detailQuery.data?.invites]);
-
-  useEffect(() => {
-    if (detailQuery.data?.group.name) {
-      setNameInput(detailQuery.data.group.name);
-    }
-  }, [detailQuery.data?.group.name]);
 
   if (!groupId) {
     return (
@@ -267,18 +203,27 @@ export default function GroupDetailPageClient() {
     );
   }
 
+  const currentUserId = user?.id ?? null;
   const movementCount = detail.expenses.length;
   const activeMembersCount = detail.members.length;
-  const canDeleteGroup = currentMemberRole === 'owner' || user?.id === detail.group.created_by;
-  const isOwner = canDeleteGroup;
-  const trimmedGroupName = nameInput.trim();
-  const canSubmitGroupName = isOwner && Boolean(trimmedGroupName) && trimmedGroupName !== detail.group.name;
 
   return (
     <div className="space-y-6">
-      <Link className="inline-flex items-center gap-2 text-sm text-primary underline-offset-2 hover:text-text-primary hover:underline" href="/grupos">
-        ← Volver a mis grupos
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link
+          className="inline-flex items-center gap-2 text-sm text-primary underline-offset-2 hover:text-text-primary hover:underline"
+          href="/grupos"
+        >
+          ← Volver a mis grupos
+        </Link>
+        <Link
+          aria-label="Configurar grupo"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/40 bg-white/60 text-lg shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+          href={`/grupos/configuracion?id=${detail.group.id}`}
+        >
+          ⚙️
+        </Link>
+      </div>
 
       <section className={`${CARD_CLASS} space-y-4`}>
         <header className="space-y-1">
@@ -287,46 +232,6 @@ export default function GroupDetailPageClient() {
             Base {detail.group.base_currency} · {detail.members.length} miembros · Creado {formatDate(detail.group.created_at)}
           </p>
         </header>
-        {isOwner && (
-          <form
-            className="space-y-3 rounded-2xl border border-white/30 bg-white/60 p-4 text-sm text-text-secondary shadow-[0_6px_18px_rgba(0,0,0,0.05)] backdrop-blur-xl"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (!canSubmitGroupName) return;
-              setNameFeedback(null);
-              updateNameMutation.mutate(trimmedGroupName);
-            }}
-          >
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-text-secondary">Nombre del grupo</label>
-              <input
-                className="input-field"
-                maxLength={120}
-                onChange={(event) => {
-                  setNameInput(event.target.value);
-                  if (nameFeedback) {
-                    setNameFeedback(null);
-                  }
-                }}
-                value={nameInput}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="submit"
-                className="btn-primary px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={updateNameMutation.isPending || !canSubmitGroupName}
-              >
-                {updateNameMutation.isPending ? 'Guardando...' : 'Guardar nombre'}
-              </button>
-              {nameFeedback && (
-                <p className={`text-xs font-medium ${nameFeedback.status === 'success' ? 'text-success' : 'text-danger'}`}>
-                  {nameFeedback.message}
-                </p>
-              )}
-            </div>
-          </form>
-        )}
         <div className="grid gap-3 text-xs text-text-secondary sm:grid-cols-3">
           <div className="glass-card p-4">
             <p className="uppercase tracking-[0.2em] text-text-secondary">Creado por</p>
@@ -395,51 +300,6 @@ export default function GroupDetailPageClient() {
         )}
       </section>
 
-      <section className={`${CARD_CLASS} space-y-6`}>
-        {user?.id ? (
-          <InviteMemberForm createdBy={user.id} groupId={detail.group.id} />
-        ) : (
-          <p className="text-sm text-text-secondary">Necesitas iniciar sesión para enviar invitaciones.</p>
-        )}
-        {pendingInvites.length > 0 && (
-          <div className="space-y-3 text-sm text-text-secondary">
-            <h4 className="font-semibold text-text-primary">Invitaciones pendientes</h4>
-            <ul className="grid gap-3 md:grid-cols-2">
-              {pendingInvites.map((invite) => (
-                <li key={invite.id} className="glass-card p-4">
-                  <p className="font-medium text-text-primary">{invite.email}</p>
-                  <p className="text-xs text-text-secondary">Expira {formatDate(invite.expiresAt)}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </section>
-
-      {canDeleteGroup && (
-        <section className={`${CARD_CLASS} space-y-4`}>
-          <div>
-            <h3 className="text-lg font-semibold text-text-primary">Zona peligrosa</h3>
-            <p className="text-sm text-text-secondary">
-              Eliminar este grupo borrará todos los gastos, participantes y liquidaciones asociadas. Esta acción no se puede deshacer.
-            </p>
-          </div>
-          {deleteMutation.error && (
-            <p className="text-sm text-danger">
-              {(deleteMutation.error as Error).message ?? 'No se pudo eliminar el grupo en este momento.'}
-            </p>
-          )}
-          <button
-            type="button"
-            className="btn-danger w-full justify-center disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={() => setShowDeleteConfirm(true)}
-            disabled={deleteMutation.isPending}
-          >
-            Eliminar grupo
-          </button>
-        </section>
-      )}
-
       <EditExpenseModal
         baseCurrency={detail.group.base_currency}
         expense={expenseToEdit}
@@ -448,38 +308,6 @@ export default function GroupDetailPageClient() {
         members={detail.members}
         onClose={closeExpenseEditor}
       />
-
-      {showDeleteConfirm && groupId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-10">
-          <div className="absolute inset-0" onClick={() => (deleteMutation.isPending ? null : setShowDeleteConfirm(false))} />
-          <div className="relative z-10 w-full max-w-lg">
-            <div className="space-y-5 rounded-2xl border border-white/40 bg-white/70 p-6 shadow-xl backdrop-blur-2xl max-h-[80vh] overflow-y-auto">
-              <h2 className="text-xl font-semibold text-text-primary">¿Eliminar el grupo?</h2>
-              <p className="text-sm text-text-secondary">
-                Esta operación eliminará permanentemente todos los gastos, miembros y asentamientos asociados a este grupo. No podrás recuperarlos más adelante.
-              </p>
-              <div className="flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={deleteMutation.isPending}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className="btn-danger disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={() => deleteMutation.mutate(groupId)}
-                  disabled={deleteMutation.isPending}
-                >
-                  {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar definitivamente'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {pendingSettlement && groupId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-10">

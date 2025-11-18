@@ -77,6 +77,10 @@ export interface Database {
           base_currency: string
           created_by: string
           created_at: string | null
+          group_type: string | null
+          start_date: string | null
+          end_date: string | null
+          description: string | null
         }
         Insert: {
           id?: string
@@ -84,6 +88,10 @@ export interface Database {
           base_currency?: string
           created_by: string
           created_at?: string | null
+          group_type?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          description?: string | null
         }
         Update: {
           id?: string
@@ -91,6 +99,10 @@ export interface Database {
           base_currency?: string
           created_by?: string
           created_at?: string | null
+          group_type?: string | null
+          start_date?: string | null
+          end_date?: string | null
+          description?: string | null
         }
         Relationships: []
       }
