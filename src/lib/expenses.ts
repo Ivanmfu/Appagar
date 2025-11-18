@@ -137,10 +137,25 @@ export async function updateExpense({
     shares,
   });
 
+  const { data: existingExpense, error: fetchExistingError } = await supabase
+    .from('expenses')
+    .select('id, created_by')
+    .eq('id', expenseId)
+    .eq('group_id', groupId)
+    .maybeSingle();
+
+  if (fetchExistingError) throw fetchExistingError;
+  if (!existingExpense) {
+    throw new Error('El gasto no existe o ya fue eliminado.');
+  }
+
+  const createdBy = existingExpense.created_by ?? updatedBy;
+
   const { data: updatedExpense, error: expenseUpdateError } = await supabase
     .from('expenses')
     .update({
       payer_id: payerId,
+      created_by: createdBy,
       amount_minor: totalCents,
       currency,
       fx_rate: fxRate,
