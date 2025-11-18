@@ -65,6 +65,7 @@ export async function createExpense({
       {
         group_id: groupId,
         payer_id: payerId,
+        created_by: createdBy,
         amount_minor: totalCents,
         currency,
         fx_rate: fxRate,

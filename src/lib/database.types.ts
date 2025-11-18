@@ -126,6 +126,7 @@ export interface Database {
           id: string
           group_id: string
           payer_id: string
+          created_by: string
           amount_minor: number
           currency: string
           fx_rate: number
@@ -139,6 +140,7 @@ export interface Database {
           id?: string
           group_id: string
           payer_id: string
+          created_by: string
           amount_minor: number
           currency?: string
           fx_rate?: number
@@ -152,6 +154,7 @@ export interface Database {
           id?: string
           group_id?: string
           payer_id?: string
+          created_by?: string
           amount_minor?: number
           currency?: string
           fx_rate?: number
