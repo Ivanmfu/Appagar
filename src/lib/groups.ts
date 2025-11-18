@@ -575,6 +575,29 @@ export async function createGroup({
   return group as GroupRow;
 }
 
+export async function updateGroupName(groupId: string, newName: string) {
+  if (!groupId) {
+    throw new Error('Falta el identificador del grupo');
+  }
+
+  const normalizedName = newName.trim();
+  if (!normalizedName) {
+    throw new Error('Introduce un nombre para el grupo');
+  }
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('groups')
+    .update({ name: normalizedName })
+    .eq('id', groupId)
+    .select('id, name, base_currency, created_at, created_by')
+    .single();
+
+  if (error) throw error;
+
+  return data as GroupRow;
+}
+
 export async function deleteGroup({ groupId, actorId }: { groupId: string; actorId: string }): Promise<void> {
   const supabase = getSupabaseClient();
 

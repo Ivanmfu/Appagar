@@ -94,6 +94,43 @@ export interface Database {
         }
         Relationships: []
       }
+      friend_invitations: {
+        Row: {
+          id: string
+          sender_id: string | null
+          receiver_id: string | null
+          created_at: string | null
+          status: string | null
+        }
+        Insert: {
+          id?: string
+          sender_id?: string | null
+          receiver_id?: string | null
+          created_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          id?: string
+          sender_id?: string | null
+          receiver_id?: string | null
+          created_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'friend_invitations_receiver_id_fkey'
+            columns: ['receiver_id']
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'friend_invitations_sender_id_fkey'
+            columns: ['sender_id']
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       group_members: {
         Row: {
           id: string

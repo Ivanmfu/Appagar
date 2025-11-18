@@ -4,6 +4,7 @@ import type { Database } from '@/lib/database.types';
 const INVITE_EXPIRATION_HOURS = 48;
 
 type GroupInviteRow = Database['public']['Tables']['group_invites']['Row'];
+type FriendInvitationRow = Database['public']['Tables']['friend_invitations']['Row'];
 type Nullable<T> = T | null;
 
 export type PendingInvite = {
@@ -27,6 +28,10 @@ export type SentInvite = {
   createdAt: Nullable<string>;
 };
 
+export type CreateGroupInviteResult =
+  | { kind: 'group'; invite: GroupInviteRow }
+  | { kind: 'friend'; invitation: FriendInvitationRow; receiverProfile: { id: string; email: string | null; display_name: string | null } };
+
 export async function createGroupInvite({
   groupId,
   email,
@@ -37,7 +42,7 @@ export async function createGroupInvite({
   email: string;
   createdBy: string;
   expiresInHours?: number;
-}): Promise<GroupInviteRow> {
+}): Promise<CreateGroupInviteResult> {
   if (!email.trim()) {
     throw new Error('Introduce un email para invitar');
   }
@@ -46,6 +51,38 @@ export async function createGroupInvite({
   const normalizedEmail = email.trim().toLowerCase();
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString();
+
+  const { data: existingProfile, error: profileLookupError } = await supabase
+    .from('profiles')
+    .select('id, email, display_name')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+
+  if (profileLookupError) {
+    throw profileLookupError;
+  }
+
+  if (existingProfile) {
+    const { data: friendInvitation, error: friendError } = await supabase
+      .from('friend_invitations')
+      .insert({
+        sender_id: createdBy,
+        receiver_id: existingProfile.id,
+        status: 'pending',
+      })
+      .select('id, sender_id, receiver_id, created_at, status')
+      .single();
+
+    if (friendError) {
+      throw friendError;
+    }
+
+    return {
+      kind: 'friend',
+      invitation: friendInvitation as FriendInvitationRow,
+      receiverProfile: existingProfile,
+    } satisfies CreateGroupInviteResult;
+  }
 
   const { data, error } = await supabase
     .from('group_invites')
@@ -64,7 +101,10 @@ export async function createGroupInvite({
     throw error;
   }
 
-  return data as GroupInviteRow;
+  return {
+    kind: 'group',
+    invite: data as GroupInviteRow,
+  } satisfies CreateGroupInviteResult;
 }
 
 export async function fetchInviteByToken(token: string) {

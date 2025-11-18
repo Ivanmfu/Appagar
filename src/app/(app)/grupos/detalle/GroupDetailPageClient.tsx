@@ -5,7 +5,7 @@ import { GroupBalanceCard } from '@/components/groups/GroupBalanceCard';
 import { ExpenseList } from '@/components/groups/ExpenseList';
 import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
 import { EditExpenseModal } from '@/components/groups/EditExpenseModal';
-import { deleteGroup, fetchGroupDetail } from '@/lib/groups';
+import { deleteGroup, fetchGroupDetail, updateGroupName } from '@/lib/groups';
 import { simplifyGroupDebts } from '@/lib/balance';
 import { settleGroupDebt } from '@/lib/settlements';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -50,6 +50,8 @@ export default function GroupDetailPageClient() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingSettlement, setPendingSettlement] = useState<SettlementPrompt | null>(null);
+  const [nameInput, setNameInput] = useState('');
+  const [nameFeedback, setNameFeedback] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     const id = searchParams?.get('id');
@@ -175,6 +177,27 @@ export default function GroupDetailPageClient() {
     },
   });
 
+  const updateNameMutation = useMutation({
+    mutationFn: async (nextName: string) => {
+      if (!groupId) {
+        throw new Error('Grupo no disponible');
+      }
+      return updateGroupName(groupId, nextName);
+    },
+    onSuccess: async (updatedGroup) => {
+      setNameFeedback({ status: 'success', message: 'Nombre actualizado correctamente.' });
+      setNameInput(updatedGroup.name);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
+      ]);
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'No se pudo actualizar el nombre del grupo.';
+      setNameFeedback({ status: 'error', message });
+    },
+  });
+
   const creatorDisplayName = useMemo(() => {
     const detail = detailQuery.data;
     if (!detail) return null;
@@ -196,6 +219,12 @@ export default function GroupDetailPageClient() {
       return new Date(invite.expiresAt) > new Date();
     });
   }, [detailQuery.data?.invites]);
+
+  useEffect(() => {
+    if (detailQuery.data?.group.name) {
+      setNameInput(detailQuery.data.group.name);
+    }
+  }, [detailQuery.data?.group.name]);
 
   if (!groupId) {
     return (
@@ -241,6 +270,9 @@ export default function GroupDetailPageClient() {
   const movementCount = detail.expenses.length;
   const activeMembersCount = detail.members.length;
   const canDeleteGroup = currentMemberRole === 'owner' || user?.id === detail.group.created_by;
+  const isOwner = canDeleteGroup;
+  const trimmedGroupName = nameInput.trim();
+  const canSubmitGroupName = isOwner && Boolean(trimmedGroupName) && trimmedGroupName !== detail.group.name;
 
   return (
     <div className="space-y-6">
@@ -255,6 +287,46 @@ export default function GroupDetailPageClient() {
             Base {detail.group.base_currency} · {detail.members.length} miembros · Creado {formatDate(detail.group.created_at)}
           </p>
         </header>
+        {isOwner && (
+          <form
+            className="space-y-3 rounded-2xl border border-white/30 bg-white/60 p-4 text-sm text-text-secondary shadow-[0_6px_18px_rgba(0,0,0,0.05)] backdrop-blur-xl"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!canSubmitGroupName) return;
+              setNameFeedback(null);
+              updateNameMutation.mutate(trimmedGroupName);
+            }}
+          >
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold uppercase tracking-[0.2em] text-text-secondary">Nombre del grupo</label>
+              <input
+                className="input-field"
+                maxLength={120}
+                onChange={(event) => {
+                  setNameInput(event.target.value);
+                  if (nameFeedback) {
+                    setNameFeedback(null);
+                  }
+                }}
+                value={nameInput}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                className="btn-primary px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={updateNameMutation.isPending || !canSubmitGroupName}
+              >
+                {updateNameMutation.isPending ? 'Guardando...' : 'Guardar nombre'}
+              </button>
+              {nameFeedback && (
+                <p className={`text-xs font-medium ${nameFeedback.status === 'success' ? 'text-success' : 'text-danger'}`}>
+                  {nameFeedback.message}
+                </p>
+              )}
+            </div>
+          </form>
+        )}
         <div className="grid gap-3 text-xs text-text-secondary sm:grid-cols-3">
           <div className="glass-card p-4">
             <p className="uppercase tracking-[0.2em] text-text-secondary">Creado por</p>

@@ -3,7 +3,8 @@
 import { useAuth } from '@/components/AuthGate';
 import { fetchGroupDetail, fetchUserGroups, GroupSummary } from '@/lib/groups';
 import { fetchInvitesCreatedBy, SentInvite } from '@/lib/invites';
-import { useQuery } from '@tanstack/react-query';
+import { fetchAcceptedFriends, fetchReceivedFriendInvitations, ReceivedFriendInvitation, AcceptedFriend, respondToFriendInvitation } from '@/lib/friends';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useMemo } from 'react';
 
@@ -42,6 +43,7 @@ function getStatusBadge(status: string) {
 
 export default function FriendsPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const groupsQuery = useQuery({
     queryKey: ['groups', user?.id],
@@ -58,6 +60,39 @@ export default function FriendsPage() {
     queryFn: async () => {
       if (!user?.id) return [] as SentInvite[];
       return fetchInvitesCreatedBy(user.id);
+    },
+  });
+
+  const receivedInvitesQuery = useQuery<ReceivedFriendInvitation[]>({
+    queryKey: ['friend-invitations', user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      if (!user?.id) return [] as ReceivedFriendInvitation[];
+      return fetchReceivedFriendInvitations(user.id);
+    },
+  });
+
+  const acceptedFriendsQuery = useQuery<AcceptedFriend[]>({
+    queryKey: ['friend-connections', user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      if (!user?.id) return [] as AcceptedFriend[];
+      return fetchAcceptedFriends(user.id);
+    },
+  });
+
+  const respondMutation = useMutation({
+    mutationFn: async ({ invitationId, action }: { invitationId: string; action: 'accept' | 'reject' }) => {
+      if (!user?.id) {
+        throw new Error('Necesitas iniciar sesión para gestionar invitaciones.');
+      }
+      return respondToFriendInvitation({ invitationId, receiverId: user.id, action });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['friend-invitations', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['friend-connections', user?.id] }),
+      ]);
     },
   });
 
@@ -90,6 +125,26 @@ export default function FriendsPage() {
     },
   });
 
+  const combinedFriends = useMemo(() => {
+    const map = new Map<string, Friend>();
+    (friendsQuery.data ?? []).forEach((friend) => {
+      map.set(friend.userId, friend);
+    });
+    (acceptedFriendsQuery.data ?? []).forEach((friend) => {
+      if (!friend.userId) return;
+      if (!map.has(friend.userId)) {
+        map.set(friend.userId, {
+          userId: friend.userId,
+          displayName: friend.displayName,
+          email: friend.email,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [friendsQuery.data, acceptedFriendsQuery.data]);
+
+  const isFriendsLoading = friendsQuery.isFetching || acceptedFriendsQuery.isFetching;
+
   return (
     <div className="space-y-6">
       <section className={`${CARD_CLASS} space-y-4`}>
@@ -100,11 +155,11 @@ export default function FriendsPage() {
           </p>
         </header>
 
-        {friendsQuery.isFetching && <p className="text-sm text-text-secondary">Actualizando contactos...</p>}
+        {isFriendsLoading && <p className="text-sm text-text-secondary">Actualizando contactos...</p>}
 
-        {friendsQuery.data && friendsQuery.data.length > 0 ? (
+        {combinedFriends.length > 0 ? (
           <ul className="grid gap-3 md:grid-cols-2">
-            {friendsQuery.data.map((friend) => (
+            {combinedFriends.map((friend) => (
               <li key={friend.userId} className="glass-card p-4">
                 <p className="text-sm font-semibold text-text-primary">{friend.displayName ?? friend.email ?? 'Integrante'}</p>
                 {friend.email && <p className="text-xs text-text-secondary">{friend.email}</p>}
@@ -112,10 +167,63 @@ export default function FriendsPage() {
             ))}
           </ul>
         ) : (
-          !friendsQuery.isFetching && (
+          !isFriendsLoading && (
             <div className="rounded-2xl border border-dashed border-border-subtle bg-white/60 p-6 text-center text-sm text-text-secondary shadow-[0_6px_18px_rgba(0,0,0,0.06)] backdrop-blur-lg">
               Todavía no has compartido gastos con nadie. Crea un grupo e invita a tus amigos para empezar.
             </div>
+          )
+        )}
+      </section>
+
+      <section className={`${CARD_CLASS} space-y-4`}>
+        <header className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-text-primary">Invitaciones recibidas</h2>
+            <p className="text-sm text-text-secondary">Responde para que la otra persona pueda verte como contacto.</p>
+          </div>
+          <span className="text-xs text-text-secondary">{receivedInvitesQuery.data?.length ?? 0} pendientes</span>
+        </header>
+
+        {receivedInvitesQuery.isLoading && <p className="text-sm text-text-secondary">Cargando invitaciones...</p>}
+        {respondMutation.isError && (
+          <p className="text-sm text-danger">No pudimos procesar la invitación. Inténtalo de nuevo.</p>
+        )}
+
+        {receivedInvitesQuery.data && receivedInvitesQuery.data.length > 0 ? (
+          <ul className="space-y-3 text-sm text-text-secondary">
+            {receivedInvitesQuery.data.map((invite) => (
+              <li key={invite.id} className="glass-card p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-text-primary">{invite.senderName ?? invite.senderEmail ?? 'Persona desconocida'}</p>
+                    {invite.senderEmail && <p className="text-xs text-text-secondary">{invite.senderEmail}</p>}
+                    <p className="mt-1 text-xs text-text-secondary">Enviada {formatDate(invite.createdAt)}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={respondMutation.isPending}
+                      onClick={() => respondMutation.mutate({ invitationId: invite.id, action: 'accept' })}
+                      className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/60"
+                    >
+                      Aceptar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={respondMutation.isPending}
+                      onClick={() => respondMutation.mutate({ invitationId: invite.id, action: 'reject' })}
+                      className="rounded-full border border-border-subtle px-4 py-2 text-xs font-semibold text-text-secondary transition hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          !receivedInvitesQuery.isLoading && (
+            <p className="text-sm text-text-secondary">No tienes invitaciones pendientes por ahora.</p>
           )
         )}
       </section>
@@ -133,10 +241,7 @@ export default function FriendsPage() {
             {sentInvitesQuery.data.map((invite) => {
               const badge = getStatusBadge(invite.status);
               return (
-                <li
-                  key={invite.id}
-                  className="glass-card p-4"
-                >
+                <li key={invite.id} className="glass-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-text-primary">{invite.email}</p>

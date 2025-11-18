@@ -14,6 +14,7 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
   const [email, setEmail] = useState('');
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   function resolveBasePath() {
     const fromEnv = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
@@ -54,7 +55,8 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
   const mutation = useMutation({
     mutationFn: async () => {
       setError(null);
-      const invite = await createGroupInvite({ groupId, email, createdBy });
+      const result = await createGroupInvite({ groupId, email, createdBy });
+      setInfoMessage(null);
       const origin = typeof window === 'undefined' ? '' : window.location.origin;
       const basePath = resolveBasePath();
       const normalizedBasePath = basePath
@@ -62,9 +64,16 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
           ? basePath.slice(0, -1)
           : basePath
         : '';
-      const link = `${origin}${normalizedBasePath}/invite?token=${invite.token}`;
-      setInviteLink(link);
-      return invite;
+      if (result.kind === 'group') {
+        const link = `${origin}${normalizedBasePath}/invite?token=${result.invite.token}`;
+        setInviteLink(link);
+        return result;
+      }
+
+      setInviteLink(null);
+      const friendlyName = result.receiverProfile.display_name ?? result.receiverProfile.email ?? 'la persona invitada';
+      setInfoMessage(`${friendlyName} ya tiene cuenta. Se ha enviado una invitación interna para conectar.`);
+      return result;
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] });
@@ -104,12 +113,17 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
           placeholder="persona@email.com"
           type="email"
           value={email}
-          onChange={(event) => setEmail(event.target.value)}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            if (error) setError(null);
+            if (infoMessage) setInfoMessage(null);
+          }}
           required
         />
       </label>
 
       {error && <p className="text-sm text-danger">{error}</p>}
+      {infoMessage && <p className="text-sm text-success">{infoMessage}</p>}
 
       <button
         className="btn-primary disabled:opacity-60 disabled:cursor-not-allowed"
