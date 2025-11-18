@@ -95,7 +95,10 @@ export async function createExpense({
 
   const { error: participantsError } = await supabase
     .from('expense_participants')
-    .insert(rows);
+    .upsert(rows, {
+      onConflict: 'expense_id,user_id',
+    })
+    .select('expense_id,user_id,share_minor,is_included');
 
   if (participantsError) throw participantsError;
 
@@ -191,7 +194,10 @@ export async function updateExpense({
 
     const { error: insertParticipantsError } = await supabase
       .from('expense_participants')
-      .insert(rows);
+      .upsert(rows, {
+        onConflict: 'expense_id,user_id',
+      })
+      .select('expense_id,user_id,share_minor,is_included');
 
     if (insertParticipantsError) throw insertParticipantsError;
   }
