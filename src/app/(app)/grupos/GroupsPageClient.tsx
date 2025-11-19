@@ -3,6 +3,7 @@
 import { useAuth } from '@/components/AuthGate';
 import { createGroup, fetchUserGroups, GroupSummary } from '@/lib/groups';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Logger, withTiming } from '@/lib/logger';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
@@ -50,7 +51,7 @@ export default function GroupsPageClient() {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as GroupSummary[];
-      return fetchUserGroups(user.id);
+      return withTiming('GroupsPage', 'fetchUserGroups', () => fetchUserGroups(user.id));
     },
   });
 
@@ -87,7 +88,7 @@ export default function GroupsPageClient() {
       if (!user?.id) {
         throw new Error('Necesitas iniciar sesión para crear un grupo');
       }
-      return createGroup({
+      return withTiming('GroupsPage', 'createGroup', () => createGroup({
         name,
         userId: user.id,
         email: profile?.email ?? user.email ?? null,
@@ -96,19 +97,22 @@ export default function GroupsPageClient() {
           (user.user_metadata as Record<string, unknown>)?.['display_name']?.toString() ??
           (user.user_metadata as Record<string, unknown>)?.['full_name']?.toString() ??
           null,
-      });
+      }));
     },
     onSuccess: async (group) => {
+      Logger.info('GroupsPage', 'Group created', { groupId: group.id });
       await queryClient.invalidateQueries({ queryKey: ['groups', user?.id] });
       setGroupName('');
       setCreateOpen(false);
       router.replace(`/grupos/detalle?id=${group.id}`);
     },
+    onError: (err) => Logger.error('GroupsPage', 'Create group error', { err }),
   });
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!groupName.trim()) return;
+    Logger.debug('GroupsPage', 'Submit create group', { name: groupName.trim() });
     createGroupMutation.mutate(groupName.trim());
   }
 

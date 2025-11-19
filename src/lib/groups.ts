@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@/lib/supabase';
+import { Logger } from '@/lib/logger';
 import { getGroupBalance } from '@/lib/balance';
 import { logActivity } from '@/lib/activity';
 import type { Database } from '@/lib/database.types';
@@ -92,6 +93,7 @@ export type UserDebtRelation = {
 
 export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   const supabase = getSupabaseClient();
+  Logger.debug('GroupsData', 'fetchUserGroups start', { userId });
 
   const { data: membershipRows, error: membershipError } = await supabase
     .from('group_members')
@@ -108,24 +110,24 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     return [];
   }
 
-  const [
-    { data: groupRows, error: groupsError },
-    { data: memberRows, error: membersError },
-    { data: expenseRows, error: expensesError },
-  ] = await Promise.all([
-    supabase
-      .from('groups')
-      .select('id, name, base_currency, created_at')
-      .in('id', groupIds),
-    supabase
-      .from('group_members')
-      .select('group_id, user_id')
-      .in('group_id', groupIds)
-      .eq('is_active', true),
-    supabase
-      .from('expenses')
-      .select('id, group_id, payer_id, date, created_at, amount_base_minor, amount_minor')
-      .in('group_id', groupIds),
+  const groupsPromise = supabase
+    .from('groups')
+    .select('id, name, base_currency, created_at')
+    .in('id', groupIds);
+  const membersPromise = supabase
+    .from('group_members')
+    .select('group_id, user_id')
+    .in('group_id', groupIds)
+    .eq('is_active', true);
+  const expensesPromise = supabase
+    .from('expenses')
+    .select('id, group_id, payer_id, date, created_at, amount_base_minor, amount_minor')
+    .in('group_id', groupIds);
+
+  const [{ data: groupRows, error: groupsError }, { data: memberRows, error: membersError }, { data: expenseRows, error: expensesError }] = await Promise.all([
+    groupsPromise,
+    membersPromise,
+    expensesPromise,
   ]);
 
   if (groupsError) throw groupsError;
@@ -254,7 +256,7 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     }
   });
 
-  return (groupRows ?? []).map((group) => ({
+  const result = (groupRows ?? []).map((group) => ({
     id: group.id,
     name: group.name,
     baseCurrency: group.base_currency,
@@ -264,6 +266,8 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     totalSpendMinor: totalSpendMap.get(group.id) ?? 0,
     userNetBalanceMinor: userNetMap.get(group.id) ?? 0,
   }));
+  Logger.debug('GroupsData', 'fetchUserGroups complete', { count: result.length });
+  return result;
 }
 
 export async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
@@ -416,6 +420,7 @@ export async function fetchUserDebtRelations(userId: string): Promise<UserDebtRe
   if (!userId) return [];
 
   const supabase = getSupabaseClient();
+  Logger.debug('GroupsData', 'fetchUserDebtRelations start', { userId });
   const groupSummaries = await fetchUserGroups(userId);
 
   if (groupSummaries.length === 0) {
@@ -477,7 +482,7 @@ export async function fetchUserDebtRelations(userId: string): Promise<UserDebtRe
 
   const fallbackName = (profile: ProfileRow | undefined) => profile?.display_name ?? profile?.email ?? 'Integrante';
 
-  return rawRelations.map((relation) => {
+  const relations = rawRelations.map((relation) => {
     const summary = metaByGroup.get(relation.groupId);
 
     const fromProfile = profileMap.get(relation.fromUserId);
@@ -489,7 +494,7 @@ export async function fetchUserDebtRelations(userId: string): Promise<UserDebtRe
     const counterpartyId = direction === 'outgoing' ? relation.toUserId : relation.fromUserId;
     const counterpartyName = direction === 'outgoing' ? toName : fromName;
 
-    return {
+    const rel = {
       groupId: relation.groupId,
       groupName: summary?.name ?? 'Grupo desconocido',
       baseCurrency: summary?.baseCurrency ?? 'EUR',
@@ -502,7 +507,10 @@ export async function fetchUserDebtRelations(userId: string): Promise<UserDebtRe
       amountCents: relation.amountCents,
       direction,
     } satisfies UserDebtRelation;
+    return rel;
   });
+  Logger.debug('GroupsData', 'fetchUserDebtRelations complete', { count: relations.length });
+  return relations;
 }
 
 export type CreateGroupInput = {

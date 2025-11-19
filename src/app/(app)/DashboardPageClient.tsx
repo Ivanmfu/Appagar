@@ -9,6 +9,7 @@ import {
 } from '@/lib/groups';
 import { settleGroupDebt } from '@/lib/settlements';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Logger, withTiming } from '@/lib/logger';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
@@ -52,7 +53,7 @@ export default function DashboardPageClient() {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as GroupSummary[];
-      return fetchUserGroups(user.id);
+      return withTiming('Dashboard', 'fetchUserGroups', () => fetchUserGroups(user.id));
     },
   });
 
@@ -61,7 +62,7 @@ export default function DashboardPageClient() {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as UserDebtRelation[];
-      return fetchUserDebtRelations(user.id);
+      return withTiming('Dashboard', 'fetchUserDebtRelations', () => fetchUserDebtRelations(user.id));
     },
     staleTime: 15_000,
   });
@@ -115,13 +116,14 @@ export default function DashboardPageClient() {
       toUserId: string;
       amountCents: number;
     }) =>
-      settleGroupDebt({
+      withTiming('Dashboard', 'settleGroupDebt', () => settleGroupDebt({
         groupId,
         fromUserId,
         toUserId,
         amountMinor: amountCents,
-      }),
+      })),
     onSuccess: async (_result, variables) => {
+      Logger.info('Dashboard', 'Settlement success', { groupId: variables.groupId });
       setPendingSettlement(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['debt-relations', user?.id] }),
@@ -129,6 +131,7 @@ export default function DashboardPageClient() {
         queryClient.invalidateQueries({ queryKey: ['group-detail', variables.groupId] }),
       ]);
     },
+    onError: (err) => Logger.error('Dashboard', 'Settlement error', { err }),
   });
 
   const closeIncomingModal = () => {
