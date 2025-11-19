@@ -40,6 +40,14 @@ jobs:
       - name: Add .nojekyll file
         run: touch out/.nojekyll
 
+      - name: Prepare files for GitHub Pages subdirectory
+        run: |
+          mkdir -p out_temp/Appagar
+          mv out/* out_temp/Appagar/ 2>/dev/null || true
+          mv out/.nojekyll out_temp/ 2>/dev/null || true
+          rm -rf out
+          mv out_temp out
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
