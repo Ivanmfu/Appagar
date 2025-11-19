@@ -69,7 +69,7 @@ This repo ships with a `deploy.yml` workflow that builds the app with `next buil
 
 Para forzar un nuevo deploy basta con hacer un commit (aunque sea vacío) en `main` o lanzar el workflow manualmente desde la pestaña *Actions*.
 
-> **Tip rápido:** si solo necesitas refrescar la página publicada después de rotar las claves, añade una nota temporal a este README, haz commit y borra el cambio después para mantener el historial limpio.
+> **Tip rápido:** si solo necesitas refrescar la página publicada después de rotar las claves o cambiar secretos, añade una nota temporal a este README, haz commit y borra el cambio después para mantener el historial limpio.
 
 ### Vercel (opcional)
 
