@@ -4,8 +4,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Configurado para GitHub Pages
-  basePath: '/Appagar',
 };
 
 export default nextConfig;
