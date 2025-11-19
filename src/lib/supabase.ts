@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Logger, maskKey } from './logger';
 import { Database } from './database.types';
 
 type Supabase = SupabaseClient<Database>;
@@ -23,6 +24,7 @@ export function getSupabaseClient(): Supabase {
   }
 
   if (!globalForSupabase.__supabaseClient) {
+    Logger.info('Supabase', 'Initializing client', { urlPresent: Boolean(supabaseUrl), anonKeyMasked: maskKey(supabaseAnonKey) });
     globalForSupabase.__supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
@@ -45,6 +47,19 @@ export function getSupabaseClient(): Supabase {
           eventsPerSecond: 2,
         },
       },
+    });
+    try {
+      const existingRaw = typeof window !== 'undefined' ? window.localStorage.getItem('appagar-auth') : null;
+      if (existingRaw) {
+        Logger.debug('Supabase', 'Found persisted session snapshot', { length: existingRaw.length });
+      } else {
+        Logger.debug('Supabase', 'No persisted session found');
+      }
+    } catch (e) {
+      Logger.warn('Supabase', 'Failed reading localStorage', { err: e });
+    }
+    globalForSupabase.__supabaseClient.auth.onAuthStateChange((event, session) => {
+      Logger.info('AuthEvent', event, { hasSession: Boolean(session), userId: session?.user?.id, email: session?.user?.email });
     });
   }
 

@@ -2,6 +2,7 @@
 
 import { linkPendingGroupInvitesToUser } from '@/lib/invites';
 import { getSupabaseClient } from '@/lib/supabase';
+import { Logger, withTiming } from '@/lib/logger';
 import type { Session, User } from '@supabase/supabase-js';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -32,9 +33,9 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 async function ensureProfile(user: User | null) {
-  console.log('[ensureProfile] Called with user:', user?.email);
+  Logger.debug('Profile', 'ensureProfile invoked', { email: user?.email });
   if (!user) {
-    console.log('[ensureProfile] No user, returning null');
+    Logger.debug('Profile', 'No user, returning null');
     return null;
   }
 
@@ -47,7 +48,7 @@ async function ensureProfile(user: User | null) {
 
   try {
     const supabase = getSupabaseClient();
-    console.log('[ensureProfile] Fetching profile from DB with 3s timeout...');
+    Logger.debug('Profile', 'Fetching profile (timeout 3s)');
     
     // Crear promesa con timeout de 3 segundos
     const fetchPromise = supabase
@@ -62,25 +63,23 @@ async function ensureProfile(user: User | null) {
 
     const { data: existing, error: fetchError } = await Promise.race([
       fetchPromise,
-      timeoutPromise
+      timeoutPromise,
     ]) as Awaited<typeof fetchPromise>;
-
-    console.log('[ensureProfile] DB query result:', { existing, fetchError });
+    Logger.debug('Profile', 'DB query result', { hasExisting: Boolean(existing), fetchError });
 
     if (fetchError) {
-      console.error('[Profile] Error fetching profile:', fetchError);
-      console.log('[ensureProfile] Returning fallback after fetch error');
+      Logger.warn('Profile', 'Error fetching profile, returning fallback', { fetchError });
       return fallbackProfile;
     }
 
     if (existing) {
-      console.log('[ensureProfile] Profile found:', existing);
+      Logger.debug('Profile', 'Existing profile found', existing);
       await linkPendingGroupInvitesToUser({ userId: user.id, email: existing.email ?? user.email ?? null });
       return existing;
     }
 
     // Intentar crear perfil (sin esperar)
-    console.log('[ensureProfile] No profile found, attempting background create...');
+    Logger.info('Profile', 'No profile found – scheduling background upsert');
     const newProfile = {
       id: user.id,
       email: user.email,
@@ -95,19 +94,19 @@ async function ensureProfile(user: User | null) {
       .single()
       .then(({ data, error }) => {
         if (error) {
-          console.error('[Profile] Background upsert error:', error);
+          Logger.warn('Profile', 'Background upsert error', { error });
         } else {
-          console.log('[Profile] Background upsert success:', data);
+          Logger.info('Profile', 'Background upsert success', data);
         }
       });
 
     await linkPendingGroupInvitesToUser({ userId: user.id, email: user.email ?? fallbackProfile.email ?? null });
-    console.log('[ensureProfile] Returning fallback immediately');
+    Logger.debug('Profile', 'Returning fallback');
     return fallbackProfile;
   } catch (error) {
-    console.error('[Profile] Error or timeout:', error);
+    Logger.warn('Profile', 'Exception/timeout - returning fallback', { error });
     await linkPendingGroupInvitesToUser({ userId: user.id, email: user.email ?? fallbackProfile.email ?? null });
-    console.log('[ensureProfile] Returning fallback after exception');
+    Logger.debug('Profile', 'Fallback after exception');
     return fallbackProfile;
   }
 }
@@ -122,11 +121,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
   const refresh = useCallback(async () => {
-    console.log('[Auth] refresh() called');
+    Logger.info('Auth', 'Manual refresh invoked');
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error) {
-        console.error('Error al recuperar la sesión', error);
+        Logger.warn('Auth', 'Error getting session', { error });
         setSession(null);
         setProfile(null);
         return;
@@ -134,10 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const nextSession = data.session ?? null;
       setSession(nextSession);
-      const ensuredProfile = await ensureProfile(nextSession?.user ?? null);
+      const ensuredProfile = await withTiming('Auth', 'ensureProfile', () => ensureProfile(nextSession?.user ?? null));
       setProfile(ensuredProfile ?? null);
     } catch (error) {
-      console.error('Error inesperado al recuperar sesión:', error);
+      Logger.error('Auth', 'Unexpected error during refresh', { error });
       setSession(null);
       setProfile(null);
     } finally {
@@ -160,38 +159,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, 10000);
 
     (async () => {
-      console.log('[Auth] Initializing...');
+      Logger.info('Auth', 'Initializing');
       try {
         const { data, error } = await supabase.auth.getSession();
-        console.log('[Auth] getSession result:', { 
-          hasSession: !!data.session, 
-          error,
-          userId: data.session?.user?.id,
-          email: data.session?.user?.email
-        });
+        Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, userId: data.session?.user?.id, email: data.session?.user?.email });
 
         if (!isMounted) return;
 
         if (error) {
-          console.error('[Auth] Error getting session:', error);
+          Logger.warn('Auth', 'Error in getSession', { error });
         }
 
         setSession(data.session);
 
         if (data.session) {
-          console.log('[Auth] User found:', data.session.user.email);
-          console.log('[Auth] Calling ensureProfile...');
-          const profile = await ensureProfile(data.session.user);
-          console.log('[Auth] ensureProfile returned:', profile);
+          Logger.info('Auth', 'User session detected', { email: data.session.user.email });
+          const profile = await withTiming('Auth', 'ensureProfile(initial)', () => ensureProfile(data.session!.user));
           setProfile(profile);
-          console.log('[Auth] Profile loaded and state updated');
+          Logger.debug('Auth', 'Profile state updated');
         }
       } catch (error) {
-        console.error('[Auth] Error in initialize:', error);
+        Logger.error('Auth', 'Error in initialize', { error });
       } finally {
         clearTimeout(timeoutId);
         if (isMounted) {
-          console.log('[Auth] Setting loading=false');
+          Logger.debug('Auth', 'Initialization complete; loading=false');
           setLoading(false);
         }
       }
@@ -199,22 +191,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!isMounted) return;
-      console.log('[Auth] Event:', event, 'Has session:', !!newSession);
+      Logger.info('Auth', 'Auth state change', { event, hasSession: !!newSession });
       
       try {
         setSession(newSession);
         if (newSession?.user) {
-          console.log('[Auth] Loading profile for:', newSession.user.email);
-          const profile = await ensureProfile(newSession.user);
+          Logger.debug('Auth', 'ensureProfile on auth event', { email: newSession.user.email });
+          const profile = await withTiming('Auth', 'ensureProfile(event)', () => ensureProfile(newSession.user));
           setProfile(profile);
-          console.log('[Auth] Profile loaded in event handler');
         } else {
           setProfile(null);
         }
       } catch (err) {
-        console.error('[Auth] Error in event handler:', err);
+        Logger.error('Auth', 'Error in event handler', { err });
       } finally {
-        console.log('[Auth] Event handler setting loading=false');
+        Logger.debug('Auth', 'Auth event complete; loading=false');
         setLoading(false);
       }
     });
@@ -257,9 +248,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    console.log('AuthGate - loading:', loading, 'user:', !!user);
+    Logger.debug('AuthGate', 'Render gating check', { loading, hasUser: !!user });
     if (!loading && !user) {
-      console.log('AuthGate - Redirigiendo a login');
+      Logger.info('AuthGate', 'Redirecting to /login (no user)');
       router.replace('/login');
     }
   }, [loading, user, router]);
