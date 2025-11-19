@@ -64,15 +64,16 @@ export function InviteMemberForm({ groupId, createdBy }: Props) {
           ? basePath.slice(0, -1)
           : basePath
         : '';
-      if (result.kind === 'group') {
-        const link = `${origin}${normalizedBasePath}/invite?token=${result.invite.token}`;
-        setInviteLink(link);
-        return result;
+      const link = `${origin}${normalizedBasePath}/invite?token=${result.invite.token}`;
+      setInviteLink(link);
+
+      if (result.alreadyRegistered && result.receiverProfile) {
+        const friendlyName = result.receiverProfile.display_name ?? result.receiverProfile.email ?? 'la persona invitada';
+        setInfoMessage(`${friendlyName} ya tiene cuenta y verá la invitación directamente en su bandeja.`);
+      } else {
+        setInfoMessage('La invitación quedó registrada. También puedes compartir el enlace si lo prefieres.');
       }
 
-      setInviteLink(null);
-      const friendlyName = result.receiverProfile.display_name ?? result.receiverProfile.email ?? 'la persona invitada';
-      setInfoMessage(`${friendlyName} ya tiene cuenta. Se ha enviado una invitación interna para conectar.`);
       return result;
     },
     onSuccess: async () => {

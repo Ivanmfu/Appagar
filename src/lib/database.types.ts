@@ -225,6 +225,9 @@ export interface Database {
           expires_at: string | null
           created_at: string | null
           created_by: string
+          sender_id: string | null
+          receiver_email: string | null
+          receiver_id: string | null
         }
         Insert: {
           id?: string
@@ -235,6 +238,9 @@ export interface Database {
           expires_at?: string | null
           created_at?: string | null
           created_by: string
+          sender_id?: string | null
+          receiver_email?: string | null
+          receiver_id?: string | null
         }
         Update: {
           id?: string
@@ -245,8 +251,36 @@ export interface Database {
           expires_at?: string | null
           created_at?: string | null
           created_by?: string
+          sender_id?: string | null
+          receiver_email?: string | null
+          receiver_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'group_invites_created_by_fkey'
+            columns: ['created_by']
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'group_invites_group_id_fkey'
+            columns: ['group_id']
+            referencedRelation: 'groups'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'group_invites_receiver_id_fkey'
+            columns: ['receiver_id']
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'group_invites_sender_id_fkey'
+            columns: ['sender_id']
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
       }
       expense_participants: {
         Row: {

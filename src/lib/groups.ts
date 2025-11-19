@@ -57,7 +57,10 @@ export type GroupExpense = {
 
 export type GroupInvite = {
   id: string;
-  email: string;
+  groupId: string;
+  receiverEmail: Nullable<string>;
+  receiverId: Nullable<string>;
+  senderId: Nullable<string>;
   status: string;
   token: string;
   expiresAt: Nullable<string>;
@@ -282,7 +285,7 @@ export async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
       .eq('group_id', groupId),
     supabase
       .from('group_invites')
-      .select('id, email, status, token, expires_at, created_at, created_by')
+      .select('id, group_id, email, receiver_email, receiver_id, status, token, expires_at, created_at, created_by, sender_id')
       .eq('group_id', groupId)
       .order('created_at', { ascending: false })
       .limit(20),
@@ -387,13 +390,16 @@ export async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
 
   const invites: GroupInvite[] = (invitesRes.data ?? []).map((row) => ({
     id: row.id,
-    email: row.email,
+    groupId: row.group_id,
+    receiverEmail: row.receiver_email ?? row.email ?? null,
+    receiverId: row.receiver_id ?? null,
+    senderId: row.sender_id ?? row.created_by ?? null,
     status: row.status,
     token: row.token,
     expiresAt: row.expires_at ?? null,
     createdAt: row.created_at ?? null,
     createdBy: row.created_by,
-  }));
+  } satisfies GroupInvite));
 
   const balances = await getGroupBalance(groupId);
 

@@ -185,7 +185,10 @@ export default function GroupSettingsPageClient() {
             <ul className="grid gap-3 md:grid-cols-2">
               {pendingInvites.map((invite) => (
                 <li key={invite.id} className="glass-card p-4">
-                  <p className="font-medium text-text-primary">{invite.email}</p>
+                  <p className="font-medium text-text-primary">{invite.receiverEmail ?? 'Invitación sin email'}</p>
+                  {invite.receiverId && (
+                    <p className="text-xs text-success">La persona ya tiene cuenta y verá esta invitación directamente.</p>
+                  )}
                   <p className="text-xs text-text-secondary">Expira {formatDate(invite.expiresAt)}</p>
                 </li>
               ))}

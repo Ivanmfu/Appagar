@@ -1,5 +1,6 @@
 'use client';
 
+import { linkPendingGroupInvitesToUser } from '@/lib/invites';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Session, User } from '@supabase/supabase-js';
 import { usePathname, useRouter } from 'next/navigation';
@@ -74,6 +75,7 @@ async function ensureProfile(user: User | null) {
 
     if (existing) {
       console.log('[ensureProfile] Profile found:', existing);
+      await linkPendingGroupInvitesToUser({ userId: user.id, email: existing.email ?? user.email ?? null });
       return existing;
     }
 
@@ -99,10 +101,12 @@ async function ensureProfile(user: User | null) {
         }
       });
 
+    await linkPendingGroupInvitesToUser({ userId: user.id, email: user.email ?? fallbackProfile.email ?? null });
     console.log('[ensureProfile] Returning fallback immediately');
     return fallbackProfile;
   } catch (error) {
     console.error('[Profile] Error or timeout:', error);
+    await linkPendingGroupInvitesToUser({ userId: user.id, email: user.email ?? fallbackProfile.email ?? null });
     console.log('[ensureProfile] Returning fallback after exception');
     return fallbackProfile;
   }

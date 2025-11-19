@@ -262,7 +262,7 @@ function InviteContent() {
         <InviteCard accent="info">
           <header className="space-y-3">
             <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-secondary">
-              Invitación para {invite.email}
+              Invitación para {invite.receiver_email ?? invite.email}
             </p>
             <h1 className="text-3xl font-semibold text-text-primary">
               Únete a {groupQuery.data?.name ?? 'tu próximo grupo'}

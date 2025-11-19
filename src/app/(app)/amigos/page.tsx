@@ -2,8 +2,20 @@
 
 import { useAuth } from '@/components/AuthGate';
 import { fetchGroupDetail, fetchUserGroups, GroupSummary } from '@/lib/groups';
-import { fetchInvitesCreatedBy, SentInvite } from '@/lib/invites';
-import { fetchAcceptedFriends, fetchReceivedFriendInvitations, ReceivedFriendInvitation, AcceptedFriend, respondToFriendInvitation } from '@/lib/friends';
+import {
+  fetchInvitesCreatedBy,
+  fetchGroupInvitationsForUser,
+  respondToGroupInvite,
+  type ReceivedGroupInvite,
+  type SentInvite,
+} from '@/lib/invites';
+import {
+  fetchAcceptedFriends,
+  fetchReceivedFriendInvitations,
+  ReceivedFriendInvitation,
+  AcceptedFriend,
+  respondToFriendInvitation,
+} from '@/lib/friends';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useMemo } from 'react';
@@ -63,12 +75,21 @@ export default function FriendsPage() {
     },
   });
 
-  const receivedInvitesQuery = useQuery<ReceivedFriendInvitation[]>({
+  const friendInvitesQuery = useQuery<ReceivedFriendInvitation[]>({
     queryKey: ['friend-invitations', user?.id],
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as ReceivedFriendInvitation[];
       return fetchReceivedFriendInvitations(user.id);
+    },
+  });
+
+  const groupInvitesQuery = useQuery<ReceivedGroupInvite[]>({
+    queryKey: ['group-invitations', user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      if (!user?.id) return [] as ReceivedGroupInvite[];
+      return fetchGroupInvitationsForUser(user.id);
     },
   });
 
@@ -81,7 +102,7 @@ export default function FriendsPage() {
     },
   });
 
-  const respondMutation = useMutation({
+  const respondFriendInviteMutation = useMutation({
     mutationFn: async ({ invitationId, action }: { invitationId: string; action: 'accept' | 'reject' }) => {
       if (!user?.id) {
         throw new Error('Necesitas iniciar sesión para gestionar invitaciones.');
@@ -92,6 +113,21 @@ export default function FriendsPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['friend-invitations', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['friend-connections', user?.id] }),
+      ]);
+    },
+  });
+
+  const respondGroupInviteMutation = useMutation({
+    mutationFn: async ({ inviteId, action }: { inviteId: string; action: 'accept' | 'decline' }) => {
+      if (!user?.id) {
+        throw new Error('Necesitas iniciar sesión para gestionar invitaciones.');
+      }
+      return respondToGroupInvite({ inviteId, userId: user.id, action });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['group-invitations', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
       ]);
     },
   });
@@ -144,6 +180,9 @@ export default function FriendsPage() {
   }, [friendsQuery.data, acceptedFriendsQuery.data]);
 
   const isFriendsLoading = friendsQuery.isFetching || acceptedFriendsQuery.isFetching;
+  const totalPendingGroupInvites = groupInvitesQuery.data?.length ?? 0;
+  const totalPendingFriendInvites = friendInvitesQuery.data?.length ?? 0;
+  const totalPendingInvites = totalPendingGroupInvites + totalPendingFriendInvites;
 
   return (
     <div className="space-y-6">
@@ -179,53 +218,102 @@ export default function FriendsPage() {
         <header className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">Invitaciones recibidas</h2>
-            <p className="text-sm text-text-secondary">Responde para que la otra persona pueda verte como contacto.</p>
+            <p className="text-sm text-text-secondary">Gestiona las invitaciones a grupos y amistades desde aquí.</p>
           </div>
-          <span className="text-xs text-text-secondary">{receivedInvitesQuery.data?.length ?? 0} pendientes</span>
+          <span className="text-xs text-text-secondary">{totalPendingInvites} pendientes</span>
         </header>
 
-        {receivedInvitesQuery.isLoading && <p className="text-sm text-text-secondary">Cargando invitaciones...</p>}
-        {respondMutation.isError && (
-          <p className="text-sm text-danger">No pudimos procesar la invitación. Inténtalo de nuevo.</p>
+        {(groupInvitesQuery.isLoading || friendInvitesQuery.isLoading) && (
+          <p className="text-sm text-text-secondary">Cargando invitaciones...</p>
+        )}
+        {respondGroupInviteMutation.isError && (
+          <p className="text-sm text-danger">No pudimos procesar la invitación al grupo. Inténtalo de nuevo.</p>
+        )}
+        {respondFriendInviteMutation.isError && (
+          <p className="text-sm text-danger">No pudimos procesar la invitación de amistad. Inténtalo de nuevo.</p>
         )}
 
-        {receivedInvitesQuery.data && receivedInvitesQuery.data.length > 0 ? (
-          <ul className="space-y-3 text-sm text-text-secondary">
-            {receivedInvitesQuery.data.map((invite) => (
-              <li key={invite.id} className="glass-card p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">{invite.senderName ?? invite.senderEmail ?? 'Persona desconocida'}</p>
-                    {invite.senderEmail && <p className="text-xs text-text-secondary">{invite.senderEmail}</p>}
-                    <p className="mt-1 text-xs text-text-secondary">Enviada {formatDate(invite.createdAt)}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={respondMutation.isPending}
-                      onClick={() => respondMutation.mutate({ invitationId: invite.id, action: 'accept' })}
-                      className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/60"
-                    >
-                      Aceptar
-                    </button>
-                    <button
-                      type="button"
-                      disabled={respondMutation.isPending}
-                      onClick={() => respondMutation.mutate({ invitationId: invite.id, action: 'reject' })}
-                      className="rounded-full border border-border-subtle px-4 py-2 text-xs font-semibold text-text-secondary transition hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Rechazar
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          !receivedInvitesQuery.isLoading && (
-            <p className="text-sm text-text-secondary">No tienes invitaciones pendientes por ahora.</p>
-          )
-        )}
+        <div className="space-y-6 text-sm text-text-secondary">
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-text-primary">Grupos</h3>
+            {groupInvitesQuery.data && groupInvitesQuery.data.length > 0 ? (
+              <ul className="space-y-3">
+                {groupInvitesQuery.data.map((invite) => (
+                  <li key={invite.id} className="glass-card p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{invite.groupName ?? 'Grupo sin nombre'}</p>
+                        <p className="text-xs text-text-secondary">
+                          Invitado por {invite.senderName ?? invite.senderEmail ?? 'un miembro del grupo'}
+                        </p>
+                        <p className="mt-1 text-xs text-text-secondary">Recibida {formatDate(invite.createdAt)}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={respondGroupInviteMutation.isPending}
+                          onClick={() => respondGroupInviteMutation.mutate({ inviteId: invite.id, action: 'accept' })}
+                          className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/60"
+                        >
+                          Aceptar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={respondGroupInviteMutation.isPending}
+                          onClick={() => respondGroupInviteMutation.mutate({ inviteId: invite.id, action: 'decline' })}
+                          className="rounded-full border border-border-subtle px-4 py-2 text-xs font-semibold text-text-secondary transition hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              !groupInvitesQuery.isLoading && <p>No tienes invitaciones a grupos en espera.</p>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-text-primary">Conexiones de amistad</h3>
+            {friendInvitesQuery.data && friendInvitesQuery.data.length > 0 ? (
+              <ul className="space-y-3">
+                {friendInvitesQuery.data.map((invite) => (
+                  <li key={invite.id} className="glass-card p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-text-primary">{invite.senderName ?? invite.senderEmail ?? 'Persona desconocida'}</p>
+                        {invite.senderEmail && <p className="text-xs text-text-secondary">{invite.senderEmail}</p>}
+                        <p className="mt-1 text-xs text-text-secondary">Enviada {formatDate(invite.createdAt)}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={respondFriendInviteMutation.isPending}
+                          onClick={() => respondFriendInviteMutation.mutate({ invitationId: invite.id, action: 'accept' })}
+                          className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/60"
+                        >
+                          Aceptar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={respondFriendInviteMutation.isPending}
+                          onClick={() => respondFriendInviteMutation.mutate({ invitationId: invite.id, action: 'reject' })}
+                          className="rounded-full border border-border-subtle px-4 py-2 text-xs font-semibold text-text-secondary transition hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Rechazar
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              !friendInvitesQuery.isLoading && <p>No tienes invitaciones de amistad pendientes.</p>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className={`${CARD_CLASS} space-y-4`}>
@@ -244,7 +332,7 @@ export default function FriendsPage() {
                 <li key={invite.id} className="glass-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-text-primary">{invite.email}</p>
+                      <p className="text-sm font-semibold text-text-primary">{invite.receiverEmail ?? 'Invitación sin email'}</p>
                       <p className="text-xs text-text-secondary">
                         Grupo: {invite.groupName ?? 'Sin nombre'} · Enviada {formatDate(invite.createdAt)}
                       </p>
