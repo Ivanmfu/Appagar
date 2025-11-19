@@ -69,6 +69,8 @@ This repo ships with a `deploy.yml` workflow that builds the app with `next buil
 
 Para forzar un nuevo deploy basta con hacer un commit (aunque sea vacío) en `main` o lanzar el workflow manualmente desde la pestaña *Actions*.
 
+> **Tip rápido:** si solo necesitas refrescar la página publicada después de rotar las claves, añade una nota temporal a este README, haz commit y borra el cambio después para mantener el historial limpio.
+
 ### Vercel (opcional)
 
 La forma más sencilla de desplegar un proyecto Next.js sigue siendo [Vercel](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme). Consulta la [documentación oficial](https://nextjs.org/docs/app/building-your-application/deploying) si prefieres ese flujo.
