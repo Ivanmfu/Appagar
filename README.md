@@ -54,8 +54,21 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Deploy
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### GitHub Pages workflow
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This repo ships with a `deploy.yml` workflow that builds the app with `next build` (static export) and publishes it to GitHub Pages. To avoid blank states in producción, recuerda configurar los siguientes secretos en `Settings → Secrets and variables → Actions`:
+
+| Secret | Valor |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase (p. ej. `https://xxxxx.supabase.co`) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave `anon` obtenida en Supabase → Project Settings → API |
+
+> **Importante:** cada vez que regeneres las claves en Supabase, actualiza estos secretos y vuelve a desplegar para evitar que las peticiones queden vacías en producción.
+
+Para forzar un nuevo deploy basta con hacer un commit (aunque sea vacío) en `main` o lanzar el workflow manualmente desde la pestaña *Actions*.
+
+### Vercel (opcional)
+
+La forma más sencilla de desplegar un proyecto Next.js sigue siendo [Vercel](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme). Consulta la [documentación oficial](https://nextjs.org/docs/app/building-your-application/deploying) si prefieres ese flujo.
