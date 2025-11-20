@@ -109,6 +109,9 @@ async function ensureProfile(user: User | null) {
   }
 }
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+const loginPath = `${basePath}/login`;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -159,22 +162,93 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       Logger.info('Auth', 'Initializing');
       try {
-        const { data, error } = await supabase.auth.getSession();
-        Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, userId: data.session?.user?.id, email: data.session?.user?.email });
+        let sessionToUse: Session | null = null;
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          const hasCode = url.searchParams.has('code');
+          const hasError = url.searchParams.has('error_description') || url.searchParams.has('error');
+          const hasHashTokens = url.hash.includes('access_token') || url.hash.includes('refresh_token');
+          const hasAuthParams = hasCode || hasError || hasHashTokens;
 
-        if (!isMounted) return;
+          if (hasAuthParams) {
+            Logger.info('Auth', 'Processing auth callback manually');
+            const isTokenCallback = hasHashTokens && !hasCode;
 
-        if (error) {
-          Logger.warn('Auth', 'Error in getSession', { error });
+            if (isTokenCallback) {
+              const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+              const access_token = hashParams.get('access_token');
+              const refresh_token = hashParams.get('refresh_token');
+
+              if (access_token && refresh_token) {
+                const { data, error } = await supabase.auth.setSession({
+                  access_token,
+                  refresh_token,
+                });
+
+                Logger.debug('Auth', 'setSession result from hash tokens', {
+                  hasSession: !!data.session,
+                  error,
+                });
+
+                if (error) {
+                  Logger.warn('Auth', 'Auth callback processing returned error', { error });
+                }
+
+                if (data.session && isMounted) {
+                  Logger.info('Auth', 'Session obtained from token callback');
+                  sessionToUse = data.session;
+                  setSession(data.session);
+                  const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
+                  setProfile(profile);
+                }
+              } else {
+                Logger.warn('Auth', 'Token callback missing access/refresh token');
+              }
+            } else {
+              const { data, error } = await supabase.auth.exchangeCodeForSession(url.toString());
+
+              Logger.debug('Auth', 'exchangeCodeForSession result', {
+                hasSession: !!data.session,
+                error,
+              });
+
+              if (error) {
+                Logger.warn('Auth', 'Auth callback processing returned error', { error });
+              }
+
+              if (data.session && isMounted) {
+                Logger.info('Auth', 'Session obtained from callback');
+                sessionToUse = data.session;
+                setSession(data.session);
+                const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
+                setProfile(profile);
+              }
+            }
+
+            // Clean sensitive params from the URL once processed
+            router.replace(pathname || '/');
+          }
         }
 
-        setSession(data.session);
+        if (!sessionToUse) {
+          const { data, error } = await supabase.auth.getSession();
+          Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, userId: data.session?.user?.id, email: data.session?.user?.email });
 
-        if (data.session) {
-          Logger.info('Auth', 'User session detected', { email: data.session.user.email, userId: data.session.user.id });
-          const profile = await withTiming('Auth', 'ensureProfile(initial)', () => ensureProfile(data.session!.user));
-          setProfile(profile);
-          Logger.debug('Auth', 'Profile state updated');
+          if (!isMounted) return;
+
+          if (error) {
+            Logger.warn('Auth', 'Error in getSession', { error });
+          }
+
+          sessionToUse = data.session;
+          setSession(sessionToUse);
+
+          if (sessionToUse) {
+            Logger.info('Auth', 'User session detected', { email: sessionToUse.user.email, userId: sessionToUse.user.id });
+            const profile = await withTiming('Auth', 'ensureProfile(initial)', () => ensureProfile(sessionToUse!.user));
+            setProfile(profile);
+            Logger.debug('Auth', 'Profile state updated');
+          }
         }
       } catch (error) {
         Logger.error('Auth', 'Error in initialize', { error });
@@ -212,15 +286,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [pathname, router, supabase]);
 
   // Efecto separado para manejar redirecciones
   useEffect(() => {
     if (loading) return;
-    
-    if (!session && pathname !== '/login') {
+
+    const isLoginRoute = pathname === '/login' || pathname === loginPath || pathname?.endsWith('/login');
+
+    if (!session && !isLoginRoute) {
       router.replace('/login');
-    } else if (session && pathname === '/login') {
+    } else if (session && isLoginRoute) {
       router.replace('/');
     }
   }, [pathname, session, loading, router]);
