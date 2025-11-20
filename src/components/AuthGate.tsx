@@ -174,25 +174,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             Logger.info('Auth', 'Processing auth callback manually');
             const isTokenCallback = hasHashTokens && !hasCode;
 
-            const { data, error } = isTokenCallback
-              ? await supabase.auth.getSessionFromUrl({ storeSession: true })
-              : await supabase.auth.exchangeCodeForSession(url.toString());
+            if (isTokenCallback) {
+              const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+              const access_token = hashParams.get('access_token');
+              const refresh_token = hashParams.get('refresh_token');
 
-            Logger.debug('Auth', isTokenCallback ? 'getSessionFromUrl result' : 'exchangeCodeForSession result', {
-              hasSession: !!data.session,
-              error,
-            });
+              if (access_token && refresh_token) {
+                const { data, error } = await supabase.auth.setSession({
+                  access_token,
+                  refresh_token,
+                });
 
-            if (error) {
-              Logger.warn('Auth', 'Auth callback processing returned error', { error });
-            }
+                Logger.debug('Auth', 'setSession result from hash tokens', {
+                  hasSession: !!data.session,
+                  error,
+                });
 
-            if (data.session && isMounted) {
-              Logger.info('Auth', 'Session obtained from callback');
-              sessionToUse = data.session;
-              setSession(data.session);
-              const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
-              setProfile(profile);
+                if (error) {
+                  Logger.warn('Auth', 'Auth callback processing returned error', { error });
+                }
+
+                if (data.session && isMounted) {
+                  Logger.info('Auth', 'Session obtained from token callback');
+                  sessionToUse = data.session;
+                  setSession(data.session);
+                  const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
+                  setProfile(profile);
+                }
+              } else {
+                Logger.warn('Auth', 'Token callback missing access/refresh token');
+              }
+            } else {
+              const { data, error } = await supabase.auth.exchangeCodeForSession(url.toString());
+
+              Logger.debug('Auth', 'exchangeCodeForSession result', {
+                hasSession: !!data.session,
+                error,
+              });
+
+              if (error) {
+                Logger.warn('Auth', 'Auth callback processing returned error', { error });
+              }
+
+              if (data.session && isMounted) {
+                Logger.info('Auth', 'Session obtained from callback');
+                sessionToUse = data.session;
+                setSession(data.session);
+                const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
+                setProfile(profile);
+              }
             }
 
             // Clean sensitive params from the URL once processed
