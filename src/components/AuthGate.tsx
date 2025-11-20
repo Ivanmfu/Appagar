@@ -78,31 +78,29 @@ async function ensureProfile(user: User | null) {
       return existing;
     }
 
-    // Intentar crear perfil (sin esperar)
-    Logger.info('Profile', 'No profile found – scheduling background upsert');
+    Logger.info('Profile', 'No profile found – creating profile');
     const newProfile = {
       id: user.id,
       email: user.email,
       display_name: fallbackProfile.display_name,
-    };
+    } satisfies Profile;
 
-    // Intentar crear en background sin bloquear
-    getSupabaseClient()
+    const { data: created, error: upsertError } = await supabase
       .from('profiles')
-      .upsert(newProfile)
+      .upsert(newProfile, { onConflict: 'id' })
       .select('id, email, display_name')
-      .single()
-      .then(({ data, error }) => {
-        if (error) {
-          Logger.warn('Profile', 'Background upsert error', { error });
-        } else {
-          Logger.info('Profile', 'Background upsert success', data);
-        }
-      });
+      .single();
 
-    await linkPendingGroupInvitesToUser({ userId: user.id, email: user.email ?? fallbackProfile.email ?? null });
-    Logger.debug('Profile', 'Returning fallback');
-    return fallbackProfile;
+    if (upsertError) {
+      Logger.warn('Profile', 'Upsert error, returning fallback', { upsertError });
+      await linkPendingGroupInvitesToUser({ userId: user.id, email: user.email ?? fallbackProfile.email ?? null });
+      return fallbackProfile;
+    }
+
+    const profileToUse = created ?? newProfile;
+    await linkPendingGroupInvitesToUser({ userId: user.id, email: profileToUse.email ?? fallbackProfile.email ?? null });
+    Logger.info('Profile', 'Profile created', profileToUse);
+    return profileToUse;
   } catch (error) {
     Logger.warn('Profile', 'Exception/timeout - returning fallback', { error });
     await linkPendingGroupInvitesToUser({ userId: user.id, email: user.email ?? fallbackProfile.email ?? null });

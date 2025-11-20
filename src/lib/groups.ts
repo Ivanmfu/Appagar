@@ -95,15 +95,18 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   const supabase = getSupabaseClient();
   Logger.debug('GroupsData', 'fetchUserGroups start', { userId });
 
-  const { data: membershipRows, error: membershipError } = await supabase
+  const { data: membershipRows, error: membershipError, status: membershipStatus } = await supabase
     .from('group_members')
     .select('group_id')
     .eq('user_id', userId)
     .eq('is_active', true);
 
   if (membershipError) {
+    Logger.error('GroupsData', 'Membership query failed', { membershipError, membershipStatus });
     throw membershipError;
   }
+
+  Logger.debug('GroupsData', 'Membership query success', { count: (membershipRows ?? []).length });
 
   const groupIds = (membershipRows ?? []).map((row) => row.group_id);
   if (groupIds.length === 0) {
@@ -130,9 +133,18 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     expensesPromise,
   ]);
 
-  if (groupsError) throw groupsError;
-  if (membersError) throw membersError;
-  if (expensesError) throw expensesError;
+  if (groupsError) {
+    Logger.error('GroupsData', 'Groups query failed', { groupsError });
+    throw groupsError;
+  }
+  if (membersError) {
+    Logger.error('GroupsData', 'Group members query failed', { membersError });
+    throw membersError;
+  }
+  if (expensesError) {
+    Logger.error('GroupsData', 'Expenses query failed', { expensesError });
+    throw expensesError;
+  }
 
   const expenseIds = (expenseRows ?? []).map((row) => row.id);
 
@@ -143,7 +155,10 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
         .in('expense_id', expenseIds)
     : { data: [] as ExpenseParticipantRow[], error: null };
 
-  if (participantError) throw participantError;
+  if (participantError) {
+    Logger.error('GroupsData', 'Participants query failed', { participantError });
+    throw participantError;
+  }
 
   const memberCountMap = new Map<string, number>();
   (memberRows ?? []).forEach((row) => {
@@ -231,7 +246,10 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
         .in('group_id', groupIds)
     : { data: [] as { group_id: string | null; from_user_id: string; to_user_id: string; amount_minor: number }[], error: null };
 
-  if (settlementError) throw settlementError;
+  if (settlementError) {
+    Logger.error('GroupsData', 'Settlements query failed', { settlementError });
+    throw settlementError;
+  }
 
   (settlementRows ?? []).forEach((settlement) => {
     if (!settlement.group_id) return;
