@@ -5,6 +5,7 @@ const nextConfig = {
     unoptimized: true,
   },
   basePath: '/Appagar',
+  assetPrefix: '/Appagar',
 };
 
 export default nextConfig;
