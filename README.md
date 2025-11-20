@@ -74,3 +74,7 @@ Para forzar un nuevo deploy basta con hacer un commit (aunque sea vacío) en `ma
 ### Vercel (opcional)
 
 La forma más sencilla de desplegar un proyecto Next.js sigue siendo [Vercel](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme). Consulta la [documentación oficial](https://nextjs.org/docs/app/building-your-application/deploying) si prefieres ese flujo.
+
+## Notas de autenticación
+
+- 2025-11-20: `AuthGate` ahora registra el `userId` junto al correo al detectar sesiones e `src/lib/groups.ts` lista los `groupIds` retornados. Estos logs adicionales ayudan a depurar diferencias entre la sesión activa y los registros de membresías en Supabase.
