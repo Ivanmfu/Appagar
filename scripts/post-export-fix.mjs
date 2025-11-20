@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,10 +6,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const outDir = join(__dirname, '..', 'out');
 const baseSegment = 'Appagar';
+const routesDir = join(outDir, baseSegment);
 
-function copyIfMissing(sourceName, targetName) {
+function copyTo(sourceName, targetName) {
   const sourcePath = join(outDir, sourceName);
   const targetPath = join(outDir, targetName);
+  const targetDir = dirname(targetPath);
 
   if (!existsSync(sourcePath)) {
     console.warn(`[post-export-fix] Source file missing: ${sourceName}`);
@@ -17,6 +19,9 @@ function copyIfMissing(sourceName, targetName) {
   }
 
   try {
+    if (!existsSync(targetDir)) {
+      mkdirSync(targetDir, { recursive: true });
+    }
     copyFileSync(sourcePath, targetPath);
     console.info(`[post-export-fix] Copied ${sourceName} -> ${targetName}`);
   } catch (error) {
@@ -24,5 +29,11 @@ function copyIfMissing(sourceName, targetName) {
   }
 }
 
-copyIfMissing('index.html', `${baseSegment}.html`);
-copyIfMissing('index.txt', `${baseSegment}.txt`);
+copyTo('index.html', `${baseSegment}.html`);
+copyTo('index.txt', `${baseSegment}.txt`);
+copyTo('index.html', `${baseSegment.toLowerCase()}.html`);
+copyTo('index.txt', `${baseSegment.toLowerCase()}.txt`);
+copyTo('index.html', join(baseSegment, 'index.html'));
+copyTo('index.txt', join(baseSegment, 'index.txt'));
+copyTo('index.html', join(baseSegment.toLowerCase(), 'index.html'));
+copyTo('index.txt', join(baseSegment.toLowerCase(), 'index.txt'));
