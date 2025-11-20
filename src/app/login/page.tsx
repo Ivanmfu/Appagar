@@ -47,7 +47,7 @@ export default function LoginPage() {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin + '/Appagar'
+            emailRedirectTo: window.location.origin + '/Appagar/login'
           }
         });
         if (authError) throw authError;
@@ -81,7 +81,7 @@ export default function LoginPage() {
       const { error: authError } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: window.location.origin + '/Appagar'
+          emailRedirectTo: window.location.origin + '/Appagar/login'
         }
       });
 
@@ -103,7 +103,8 @@ export default function LoginPage() {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/Appagar`,
+          // Volvemos siempre a la pantalla de login para procesar el callback PKCE
+          redirectTo: `${window.location.origin}/Appagar/login`,
         },
       });
 
