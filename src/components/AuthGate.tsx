@@ -109,6 +109,9 @@ async function ensureProfile(user: User | null) {
   }
 }
 
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+const loginPath = `${basePath}/login`;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -162,29 +165,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let sessionToUse: Session | null = null;
         if (typeof window !== 'undefined') {
           const url = new URL(window.location.href);
-          const hasAuthParams =
-            url.searchParams.has('code') ||
-            url.searchParams.has('error_description') ||
-            url.searchParams.has('error') ||
-            url.hash.includes('access_token');
+          const hasCode = url.searchParams.has('code');
+          const hasError = url.searchParams.has('error_description') || url.searchParams.has('error');
+          const hasHashTokens = url.hash.includes('access_token') || url.hash.includes('refresh_token');
+          const hasAuthParams = hasCode || hasError || hasHashTokens;
 
           if (hasAuthParams) {
-            Logger.info('Auth', 'Processing OAuth callback manually');
-            const { data, error } = await supabase.auth.exchangeCodeForSession(url.toString());
-            Logger.debug('Auth', 'exchangeCodeForSession result', {
+            Logger.info('Auth', 'Processing auth callback manually');
+            const isTokenCallback = hasHashTokens && !hasCode;
+
+            const { data, error } = isTokenCallback
+              ? await supabase.auth.getSessionFromUrl({ storeSession: true })
+              : await supabase.auth.exchangeCodeForSession(url.toString());
+
+            Logger.debug('Auth', isTokenCallback ? 'getSessionFromUrl result' : 'exchangeCodeForSession result', {
               hasSession: !!data.session,
               error,
             });
+
             if (error) {
-              Logger.warn('Auth', 'OAuth callback processing returned error', { error });
+              Logger.warn('Auth', 'Auth callback processing returned error', { error });
             }
+
             if (data.session && isMounted) {
-              Logger.info('Auth', 'Session obtained from exchange');
+              Logger.info('Auth', 'Session obtained from callback');
               sessionToUse = data.session;
               setSession(data.session);
-              const profile = await withTiming('Auth', 'ensureProfile(exchange)', () => ensureProfile(data.session!.user));
+              const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
               setProfile(profile);
             }
+
             // Clean sensitive params from the URL once processed
             router.replace(pathname || '/');
           }
@@ -251,10 +261,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Efecto separado para manejar redirecciones
   useEffect(() => {
     if (loading) return;
-    
-    if (!session && pathname !== '/login') {
+
+    const isLoginRoute = pathname === '/login' || pathname === loginPath || pathname?.endsWith('/login');
+
+    if (!session && !isLoginRoute) {
       router.replace('/login');
-    } else if (session && pathname === '/login') {
+    } else if (session && isLoginRoute) {
       router.replace('/');
     }
   }, [pathname, session, loading, router]);

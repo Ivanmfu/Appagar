@@ -27,6 +27,9 @@ export default function LoginPage() {
   }, []);
 
   async function handleEmailPassword() {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+    const loginRedirect = `${window.location.origin}${basePath}/login`;
+
     if (!email || !password) {
       setError('Por favor ingresa tu email y contraseña');
       return;
@@ -47,7 +50,7 @@ export default function LoginPage() {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin + '/Appagar/login'
+            emailRedirectTo: loginRedirect,
           }
         });
         if (authError) throw authError;
@@ -69,6 +72,9 @@ export default function LoginPage() {
   }
 
   async function handleMagicLink() {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+    const loginRedirect = `${window.location.origin}${basePath}/login`;
+
     if (!email) {
       setError('Por favor ingresa tu email');
       return;
@@ -81,7 +87,7 @@ export default function LoginPage() {
       const { error: authError } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: window.location.origin + '/Appagar/login'
+          emailRedirectTo: loginRedirect,
         }
       });
 
@@ -96,6 +102,9 @@ export default function LoginPage() {
   }
 
   async function handleGoogleLogin() {
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+    const loginRedirect = `${window.location.origin}${basePath}/login`;
+
     try {
       setError('');
       setLoading(true);
@@ -104,7 +113,7 @@ export default function LoginPage() {
         provider: 'google',
         options: {
           // Volvemos siempre a la pantalla de login para procesar el callback PKCE
-          redirectTo: `${window.location.origin}/Appagar/login`,
+          redirectTo: loginRedirect,
         },
       });
 
