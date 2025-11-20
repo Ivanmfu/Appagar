@@ -30,7 +30,9 @@ export function getSupabaseClient(): Supabase {
         persistSession: true,
         autoRefreshToken: true,
         flowType: 'pkce',
-        detectSessionInUrl: true,
+        // We handle code-exchange manually to avoid the internal PKCE initialization
+        // getting stuck on static hosting (GitHub Pages with basePath).
+        detectSessionInUrl: false,
         storage: typeof window !== 'undefined' ? window.localStorage : undefined,
         storageKey: 'appagar-auth',
       },

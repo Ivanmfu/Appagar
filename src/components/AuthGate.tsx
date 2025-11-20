@@ -159,6 +159,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       Logger.info('Auth', 'Initializing');
       try {
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          const hasAuthParams =
+            url.searchParams.has('code') ||
+            url.searchParams.has('error_description') ||
+            url.searchParams.has('error') ||
+            url.hash.includes('access_token');
+
+          if (hasAuthParams) {
+            Logger.info('Auth', 'Processing OAuth callback manually');
+            const { data, error } = await supabase.auth.exchangeCodeForSession(url.toString());
+            Logger.debug('Auth', 'exchangeCodeForSession result', {
+              hasSession: !!data.session,
+              error,
+            });
+            if (error) {
+              Logger.warn('Auth', 'OAuth callback processing returned error', { error });
+            }
+            // Clean sensitive params from the URL once processed
+            router.replace(pathname || '/');
+          }
+        }
+
         const { data, error } = await supabase.auth.getSession();
         Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, userId: data.session?.user?.id, email: data.session?.user?.email });
 
@@ -212,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [pathname, router, supabase]);
 
   // Efecto separado para manejar redirecciones
   useEffect(() => {
