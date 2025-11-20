@@ -159,22 +159,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       Logger.info('Auth', 'Initializing');
       try {
-        const { data, error } = await supabase.auth.getSession();
-        Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, userId: data.session?.user?.id, email: data.session?.user?.email });
+        let sessionToUse: Session | null = null;
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          const hasAuthParams =
+            url.searchParams.has('code') ||
+            url.searchParams.has('error_description') ||
+            url.searchParams.has('error') ||
+            url.hash.includes('access_token');
 
-        if (!isMounted) return;
-
-        if (error) {
-          Logger.warn('Auth', 'Error in getSession', { error });
+          if (hasAuthParams) {
+            Logger.info('Auth', 'Processing OAuth callback manually');
+            const { data, error } = await supabase.auth.exchangeCodeForSession(url.toString());
+            Logger.debug('Auth', 'exchangeCodeForSession result', {
+              hasSession: !!data.session,
+              error,
+            });
+            if (error) {
+              Logger.warn('Auth', 'OAuth callback processing returned error', { error });
+            }
+            if (data.session && isMounted) {
+              Logger.info('Auth', 'Session obtained from exchange');
+              sessionToUse = data.session;
+              setSession(data.session);
+              const profile = await withTiming('Auth', 'ensureProfile(exchange)', () => ensureProfile(data.session!.user));
+              setProfile(profile);
+            }
+            // Clean sensitive params from the URL once processed
+            router.replace(pathname || '/');
+          }
         }
 
-        setSession(data.session);
+        if (!sessionToUse) {
+          const { data, error } = await supabase.auth.getSession();
+          Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, userId: data.session?.user?.id, email: data.session?.user?.email });
 
-        if (data.session) {
-          Logger.info('Auth', 'User session detected', { email: data.session.user.email, userId: data.session.user.id });
-          const profile = await withTiming('Auth', 'ensureProfile(initial)', () => ensureProfile(data.session!.user));
-          setProfile(profile);
-          Logger.debug('Auth', 'Profile state updated');
+          if (!isMounted) return;
+
+          if (error) {
+            Logger.warn('Auth', 'Error in getSession', { error });
+          }
+
+          sessionToUse = data.session;
+          setSession(sessionToUse);
+
+          if (sessionToUse) {
+            Logger.info('Auth', 'User session detected', { email: sessionToUse.user.email, userId: sessionToUse.user.id });
+            const profile = await withTiming('Auth', 'ensureProfile(initial)', () => ensureProfile(sessionToUse!.user));
+            setProfile(profile);
+            Logger.debug('Auth', 'Profile state updated');
+          }
         }
       } catch (error) {
         Logger.error('Auth', 'Error in initialize', { error });
@@ -212,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [pathname, router, supabase]);
 
   // Efecto separado para manejar redirecciones
   useEffect(() => {
