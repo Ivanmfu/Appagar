@@ -6,6 +6,12 @@ export default function DebugOverlay() {
   const [events, setEvents] = useState<string[]>([]);
 
   useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('debug') === '1') {
+        window.localStorage.setItem('appagar-debug', '1');
+      }
+    } catch {}
     if (!Logger.enabled()) return;
     function push(line: string) {
       setEvents((prev) => {
