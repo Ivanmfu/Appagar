@@ -106,7 +106,10 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     throw membershipError;
   }
 
-  Logger.debug('GroupsData', 'Membership query success', { count: (membershipRows ?? []).length });
+  Logger.debug('GroupsData', 'Membership query success', {
+    count: (membershipRows ?? []).length,
+    groupIds: (membershipRows ?? []).map((row) => row.group_id),
+  });
 
   const groupIds = (membershipRows ?? []).map((row) => row.group_id);
   if (groupIds.length === 0) {
@@ -284,7 +287,10 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     totalSpendMinor: totalSpendMap.get(group.id) ?? 0,
     userNetBalanceMinor: userNetMap.get(group.id) ?? 0,
   }));
-  Logger.debug('GroupsData', 'fetchUserGroups complete', { count: result.length });
+  Logger.debug('GroupsData', 'fetchUserGroups complete', {
+    count: result.length,
+    ids: result.map((item) => item.id),
+  });
   return result;
 }
 

@@ -171,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(data.session);
 
         if (data.session) {
-          Logger.info('Auth', 'User session detected', { email: data.session.user.email });
+          Logger.info('Auth', 'User session detected', { email: data.session.user.email, userId: data.session.user.id });
           const profile = await withTiming('Auth', 'ensureProfile(initial)', () => ensureProfile(data.session!.user));
           setProfile(profile);
           Logger.debug('Auth', 'Profile state updated');
