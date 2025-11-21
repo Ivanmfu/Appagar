@@ -152,12 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
 
     // Safety timeout: force loading=false after 10 seconds
-    const timeoutId = setTimeout(() => {
-      if (isMounted) {
-        console.warn('[Auth] TIMEOUT: Forcing loading=false after 10 seconds');
-        setLoading(false);
-      }
-    }, 10000);
+      // Removed forced timeout fallback
 
     (async () => {
       Logger.info('Auth', 'Initializing');
@@ -253,7 +248,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         Logger.error('Auth', 'Error in initialize', { error });
       } finally {
-        clearTimeout(timeoutId);
         if (isMounted) {
           Logger.debug('Auth', 'Initialization complete; loading=false');
           setLoading(false);
