@@ -200,23 +200,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 Logger.warn('Auth', 'Token callback missing access/refresh token');
               }
             } else {
-              const { data, error } = await supabase.auth.exchangeCodeForSession(url.toString());
-
-              Logger.debug('Auth', 'exchangeCodeForSession result', {
-                hasSession: !!data.session,
-                error,
+              const code = url.searchParams.get('code');
+              Logger.debug('Auth', 'PKCE callback parameters', {
+                hasCode: Boolean(code),
+                codePreview: code ? `${code.slice(0, 4)}...${code.slice(-4)}` : null,
               });
 
-              if (error) {
-                Logger.warn('Auth', 'Auth callback processing returned error', { error });
-              }
+              if (!code) {
+                Logger.warn('Auth', 'Missing PKCE code parameter in callback');
+              } else {
+                const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-              if (data.session && isMounted) {
-                Logger.info('Auth', 'Session obtained from callback');
-                sessionToUse = data.session;
-                setSession(data.session);
-                const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
-                setProfile(profile);
+                Logger.debug('Auth', 'exchangeCodeForSession result', {
+                  hasSession: !!data.session,
+                  error,
+                });
+
+                if (error) {
+                  Logger.warn('Auth', 'Auth callback processing returned error', { error });
+                }
+
+                if (data.session && isMounted) {
+                  Logger.info('Auth', 'Session obtained from callback');
+                  sessionToUse = data.session;
+                  setSession(data.session);
+                  const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
+                  setProfile(profile);
+                }
               }
             }
 
