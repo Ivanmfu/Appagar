@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - rollback-915e3427
 
 permissions:
   contents: read
