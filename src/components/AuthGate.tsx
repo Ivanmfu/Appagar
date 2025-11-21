@@ -257,15 +257,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   length: verifierEntry?.value.length ?? null,
                 });
 
-                let exchangeResult: Awaited<ReturnType<typeof supabase.auth.exchangeCodeForSession>>;
-                if (verifierEntry?.value) {
-                  exchangeResult = await supabase.auth.exchangeCodeForSession({
-                    authCode: code,
-                    codeVerifier: verifierEntry.value,
-                  });
-                } else {
-                  exchangeResult = await supabase.auth.exchangeCodeForSession(code);
+                if (!verifierEntry) {
+                  Logger.warn('Auth', 'PKCE verifier not present in storage; relying on Supabase SDK fallback');
                 }
+
+                const exchangeResult = await supabase.auth.exchangeCodeForSession(code);
 
                 const { data, error } = exchangeResult;
 
