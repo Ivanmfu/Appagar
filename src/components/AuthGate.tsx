@@ -109,9 +109,8 @@ async function ensureProfile(user: User | null) {
   }
 }
 
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-const homePath = basePath || '/';
-const loginPath = `${basePath}/login`;
+const homeRoute = '/';
+const loginRoute = '/login';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -222,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             // Clean sensitive params from the URL once processed
-            router.replace(pathname || homePath);
+            router.replace(pathname || homeRoute);
           }
         }
 
@@ -287,12 +286,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    const isLoginRoute = pathname === '/login' || pathname === loginPath || pathname?.endsWith('/login');
+    const isLoginRoute = pathname === loginRoute || pathname?.endsWith('/login');
 
     if (!session && !isLoginRoute) {
-      router.replace(loginPath);
+      router.replace(loginRoute);
     } else if (session && isLoginRoute) {
-      router.replace(homePath);
+      router.replace(homeRoute);
     }
   }, [pathname, session, loading, router]);
 
@@ -320,7 +319,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     Logger.debug('AuthGate', 'Render gating check', { loading, hasUser: !!user });
     if (!loading && !user) {
       Logger.info('AuthGate', 'Redirecting to login (no user)');
-      router.replace(loginPath);
+      router.replace(loginRoute);
     }
   }, [loading, user, router]);
 

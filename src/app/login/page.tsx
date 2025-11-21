@@ -61,8 +61,7 @@ export default function LoginPage() {
           password,
         });
         if (authError) throw authError;
-        const homePath = basePath || '/';
-        router.replace(homePath);
+        router.replace('/');
       }
     } catch (error: unknown) {
       console.error(error);
