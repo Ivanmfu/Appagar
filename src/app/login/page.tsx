@@ -1,5 +1,6 @@
 'use client';
 import { getSupabaseClient } from '@/lib/supabase';
+import { useAuth } from '@/components/AuthGate';
 import { useRouter } from 'next/navigation';
 import { ChangeEvent, useEffect, useState } from 'react';
 
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [processingOAuth, setProcessingOAuth] = useState(false);
+  const { refresh } = useAuth();
 
   // Detectar si estamos procesando un callback OAuth
   useEffect(() => {
@@ -56,11 +58,15 @@ export default function LoginPage() {
         if (authError) throw authError;
         setSent(true);
       } else {
-        const { error: authError } = await supabase.auth.signInWithPassword({
+        const { data, error: authError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (authError) throw authError;
+        if (!data.session) {
+          throw new Error('No se pudo establecer la sesión. Intenta de nuevo.');
+        }
+        await refresh();
         router.replace('/');
       }
     } catch (error: unknown) {
