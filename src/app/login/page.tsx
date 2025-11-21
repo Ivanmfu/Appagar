@@ -1,6 +1,7 @@
 'use client';
-import { getSupabaseClient } from '@/lib/supabase';
+
 import { useAuth } from '@/components/AuthGate';
+import { getSupabaseClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { ChangeEvent, useEffect, useState } from 'react';
 
@@ -15,18 +16,32 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [processingOAuth, setProcessingOAuth] = useState(false);
-  const { refresh } = useAuth();
+  const { refresh, session, loading: authLoading } = useAuth();
 
-  // Detectar si estamos procesando un callback OAuth
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.slice(1));
-    
+
     if (params.has('code') || hashParams.has('access_token')) {
       console.log('[Login] OAuth callback detectado, procesando...');
       setProcessingOAuth(true);
+      setLoading(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!processingOAuth) return;
+    if (authLoading) return;
+
+    if (session) {
+      router.replace('/');
+      return;
+    }
+
+    setProcessingOAuth(false);
+    setLoading(false);
+    setError('No se pudo completar la autenticación con Google. Intenta nuevamente.');
+  }, [processingOAuth, authLoading, session, router]);
 
   async function handleEmailPassword() {
     const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
@@ -53,7 +68,7 @@ export default function LoginPage() {
           password,
           options: {
             emailRedirectTo: loginRedirect,
-          }
+          },
         });
         if (authError) throw authError;
         setSent(true);
@@ -69,9 +84,11 @@ export default function LoginPage() {
         await refresh();
         router.replace('/');
       }
-    } catch (error: unknown) {
-      console.error(error);
-      setError(error instanceof Error ? error.message : 'Error al procesar la solicitud');
+    } catch (unknownError) {
+      console.error(unknownError);
+      setError(
+        unknownError instanceof Error ? unknownError.message : 'Error al procesar la solicitud',
+      );
     } finally {
       setLoading(false);
     }
@@ -94,14 +111,14 @@ export default function LoginPage() {
         email,
         options: {
           emailRedirectTo: loginRedirect,
-        }
+        },
       });
 
       if (authError) throw authError;
       setSent(true);
-    } catch (error: unknown) {
-      console.error(error);
-      setError(error instanceof Error ? error.message : 'Error al enviar enlace');
+    } catch (unknownError) {
+      console.error(unknownError);
+      setError(unknownError instanceof Error ? unknownError.message : 'Error al enviar enlace');
     } finally {
       setLoading(false);
     }
@@ -118,15 +135,14 @@ export default function LoginPage() {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Volvemos siempre a la pantalla de login para procesar el callback PKCE
           redirectTo: loginRedirect,
         },
       });
 
       if (authError) throw authError;
-    } catch (error: unknown) {
-      console.error(error);
-      setError(error instanceof Error ? error.message : 'Error al iniciar sesión con Google');
+    } catch (unknownError) {
+      console.error(unknownError);
+      setError(unknownError instanceof Error ? unknownError.message : 'Error al iniciar sesión con Google');
       setLoading(false);
     }
   }
