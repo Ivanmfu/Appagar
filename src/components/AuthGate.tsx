@@ -16,6 +16,8 @@ import {
   useState,
 } from 'react';
 
+type StorageSource = 'localStorage' | 'sessionStorage';
+
 type Profile = {
   id: string;
   email?: string | null;
@@ -31,6 +33,42 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function findPkceVerifier(): { key: string; value: string; source: StorageSource } | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const sources: Array<{ storage: Storage; source: StorageSource }> = [];
+  if (window.localStorage) {
+    sources.push({ storage: window.localStorage, source: 'localStorage' });
+  }
+  if (window.sessionStorage) {
+    sources.push({ storage: window.sessionStorage, source: 'sessionStorage' });
+  }
+
+  for (const { storage, source } of sources) {
+    try {
+      const length = storage.length;
+      for (let index = 0; index < length; index += 1) {
+        const key = storage.key(index);
+        if (!key) continue;
+        const normalized = key.toLowerCase();
+        if (!normalized.includes('code') || !normalized.includes('verifier')) {
+          continue;
+        }
+        const value = storage.getItem(key);
+        if (value) {
+          return { key, value, source };
+        }
+      }
+    } catch (error) {
+      Logger.warn('Auth', 'Unable to inspect storage for PKCE verifier', { error, source });
+    }
+  }
+
+  return null;
+}
 
 async function ensureProfile(user: User | null) {
   Logger.debug('Profile', 'ensureProfile invoked', { email: user?.email });
@@ -201,15 +239,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               }
             } else {
               const code = url.searchParams.get('code');
+              const state = url.searchParams.get('state');
               Logger.debug('Auth', 'PKCE callback parameters', {
                 hasCode: Boolean(code),
                 codePreview: code ? `${code.slice(0, 4)}...${code.slice(-4)}` : null,
+                hasState: Boolean(state),
               });
 
               if (!code) {
                 Logger.warn('Auth', 'Missing PKCE code parameter in callback');
               } else {
-                const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+                const verifierEntry = findPkceVerifier();
+                Logger.debug('Auth', 'PKCE verifier lookup', {
+                  found: Boolean(verifierEntry),
+                  source: verifierEntry?.source ?? null,
+                  key: verifierEntry?.key ?? null,
+                  length: verifierEntry?.value.length ?? null,
+                });
+
+                let exchangeResult: Awaited<ReturnType<typeof supabase.auth.exchangeCodeForSession>>;
+                if (verifierEntry?.value) {
+                  exchangeResult = await supabase.auth.exchangeCodeForSession({
+                    authCode: code,
+                    codeVerifier: verifierEntry.value,
+                  });
+                } else {
+                  exchangeResult = await supabase.auth.exchangeCodeForSession(code);
+                }
+
+                const { data, error } = exchangeResult;
 
                 Logger.debug('Auth', 'exchangeCodeForSession result', {
                   hasSession: !!data.session,
@@ -226,6 +284,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   setSession(data.session);
                   const profile = await withTiming('Auth', 'ensureProfile(callback)', () => ensureProfile(data.session!.user));
                   setProfile(profile);
+                  if (verifierEntry) {
+                    try {
+                      const storage = verifierEntry.source === 'localStorage' ? window.localStorage : window.sessionStorage;
+                      storage.removeItem(verifierEntry.key);
+                    } catch (error) {
+                      Logger.warn('Auth', 'Unable to clean PKCE verifier from storage', { error, key: verifierEntry.key, source: verifierEntry.source });
+                    }
+                  }
                 }
               }
             }
