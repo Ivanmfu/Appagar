@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, cpSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -37,3 +37,19 @@ copyTo('index.html', join(baseSegment, 'index.html'));
 copyTo('index.txt', join(baseSegment, 'index.txt'));
 copyTo('index.html', join(baseSegment.toLowerCase(), 'index.html'));
 copyTo('index.txt', join(baseSegment.toLowerCase(), 'index.txt'));
+
+// If Next.js output contains a top-level `_next` folder, copy it under the base path
+// so that assets referenced as `/Appagar/_next/...` resolve correctly on static hosts.
+try {
+  const nextSrc = join(outDir, '_next');
+  const nextDest = join(outDir, baseSegment, '_next');
+  if (existsSync(nextSrc)) {
+    if (!existsSync(nextDest)) {
+      mkdirSync(nextDest, { recursive: true });
+    }
+    cpSync(nextSrc, nextDest, { recursive: true });
+    console.info(`[post-export-fix] Copied _next -> ${join(baseSegment, '_next')}`);
+  }
+} catch (err) {
+  console.warn('[post-export-fix] Failed to copy _next directory', err);
+}
