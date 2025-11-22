@@ -53,3 +53,38 @@ try {
 } catch (err) {
   console.warn('[post-export-fix] Failed to copy _next directory', err);
 }
+
+// Also mirror top-level static files and directories into the basePath folder so
+// requests to `/Appagar/<route>` and `/Appagar/<route>.txt` resolve correctly
+// when serving the `out` folder from the site root.
+try {
+  const entries = Array.from(new URL(`file://${outDir}/`).pathname ? [] : []);
+} catch (e) {
+  // fallback: use fs readdirSync
+}
+import { readdirSync, statSync } from 'node:fs';
+try {
+  const items = readdirSync(outDir, { withFileTypes: true });
+  for (const item of items) {
+    const name = item.name;
+    if (name === baseSegment) continue; // don't copy the folder into itself
+    if (name === '_next') continue; // already handled
+    const src = join(outDir, name);
+    const dest = join(outDir, baseSegment, name);
+    try {
+      if (item.isDirectory()) {
+        if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
+        cpSync(src, dest, { recursive: true });
+      } else {
+        const destDir = dirname(dest);
+        if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+        copyFileSync(src, dest);
+      }
+      console.info(`[post-export-fix] Mirrored ${name} -> ${join(baseSegment, name)}`);
+    } catch (err) {
+      console.warn(`[post-export-fix] Failed to mirror ${name}`, err);
+    }
+  }
+} catch (err) {
+  console.warn('[post-export-fix] Failed to mirror top-level entries into basePath', err);
+}
