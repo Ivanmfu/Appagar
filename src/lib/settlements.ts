@@ -1,5 +1,7 @@
-import { getSupabaseClient } from '@/lib/supabase';
 import type { Database } from '@/lib/database.types';
+import { AppError } from '@/lib/errors';
+import { getSupabaseClient } from '@/lib/supabase';
+import { validateSettlementInput } from '@/lib/validation';
 
 export type SettlementRow = Database['public']['Tables']['settlements']['Row'];
 
@@ -16,37 +18,29 @@ export async function settleGroupDebt({
   toUserId,
   amountMinor,
 }: CreateGroupSettlementInput): Promise<SettlementRow> {
-  if (!groupId) throw new Error('Falta el identificador del grupo');
-  if (!fromUserId || !toUserId) {
-    throw new Error('No se pudo determinar quién paga y recibe la liquidación');
-  }
-  if (fromUserId === toUserId) {
-    throw new Error('La liquidación requiere dos personas distintas');
-  }
-
-  const sanitizedAmount = Math.trunc(amountMinor);
-  if (sanitizedAmount <= 0) {
-    throw new Error('La cantidad a liquidar debe ser mayor que cero');
+  const parsed = validateSettlementInput({ groupId, fromUserId, toUserId, amountMinor });
+  if (parsed.fromUserId === parsed.toUserId) {
+    throw AppError.validation('La liquidación requiere dos personas distintas');
   }
 
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from('settlements')
     .insert({
-      group_id: groupId,
-      from_user_id: fromUserId,
-      to_user_id: toUserId,
-      amount_minor: sanitizedAmount,
+      group_id: parsed.groupId,
+      from_user_id: parsed.fromUserId,
+      to_user_id: parsed.toUserId,
+      amount_minor: Math.trunc(parsed.amountMinor),
     })
     .select()
     .single();
 
   if (error) {
-    throw error;
+    throw AppError.fromSupabase(error, 'No se pudo registrar la liquidación');
   }
 
   if (!data) {
-    throw new Error('No se pudo registrar la liquidación');
+    throw new AppError('unknown', 'No se pudo registrar la liquidación');
   }
 
   return data as SettlementRow;
