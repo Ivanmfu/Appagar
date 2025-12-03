@@ -7,6 +7,10 @@ import { getSupabaseConfig } from './config';
 const AUTH_STORAGE_KEY = 'appagar-auth';
 const AUTH_MAX_AGE_SECONDS = 60 * 60 * 24 * 60; // 60 days to align with Supabase defaults
 
+type SupabaseAuthStorage = NonNullable<
+  NonNullable<Parameters<typeof createClient>[2]>['auth']
+>['storage'];
+
 function createMiddlewareStorage(req: NextRequest, res: NextResponse) {
   return {
     getItem: (key?: string) => req.cookies.get(key ?? AUTH_STORAGE_KEY)?.value ?? null,
@@ -26,7 +30,7 @@ function createMiddlewareStorage(req: NextRequest, res: NextResponse) {
       Logger.debug('Supabase', 'Clearing auth cookie from middleware', { name });
       res.cookies.set(name, '', { maxAge: 0, path: '/', sameSite: 'lax' });
     },
-  } satisfies Parameters<typeof createClient>[2]['auth']['storage'];
+  } satisfies SupabaseAuthStorage;
 }
 
 export function getMiddlewareSupabaseClient(req: NextRequest, res: NextResponse) {
