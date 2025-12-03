@@ -36,14 +36,17 @@ BEGIN
     SET search_path = public
     AS '
     DECLARE
+      v_sub text;
       v_invite public.group_invites%rowtype;
       v_member public.group_members%rowtype;
       v_user_id uuid;
     BEGIN
-      v_user_id := auth.uid();
-      IF v_user_id IS NULL THEN
+      v_sub := current_setting(''request.jwt.claim.sub'', true);
+      IF v_sub IS NULL OR v_sub = '''' OR v_sub !~* ''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'' THEN
         RAISE EXCEPTION ''Authentication required'';
       END IF;
+
+      v_user_id := v_sub::uuid;
 
       IF p_action NOT IN (''accept'', ''decline'') THEN
         RAISE EXCEPTION ''Invalid invite action: %'', p_action;
