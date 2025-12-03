@@ -65,11 +65,15 @@ BEGIN
         RAISE EXCEPTION ''Invite belongs to another user'';
       END IF;
 
-      IF p_action = ''accept'' THEN
-        IF v_invite.status <> ''pending'' THEN
-          RAISE EXCEPTION ''Invite is no longer pending'';
-        END IF;
+      IF v_invite.status <> ''pending'' THEN
+        RAISE EXCEPTION ''Invite is no longer pending'';
+      END IF;
 
+      IF v_invite.expires_at IS NOT NULL AND v_invite.expires_at <= timezone(''utc'', now()) THEN
+        RAISE EXCEPTION ''Invite expired'';
+      END IF;
+
+      IF p_action = ''accept'' THEN
         SELECT *
         INTO v_member
         FROM public.group_members
