@@ -1,6 +1,16 @@
 const fs = require('fs');
 const Module = require('module');
+const path = require('path');
 const ts = require('typescript');
+
+const originalResolveFilename = Module._resolveFilename;
+Module._resolveFilename = function (request, parent, isMain, options) {
+  if (request.startsWith('@/')) {
+    const absolutePath = path.join(__dirname, '..', 'src', request.slice(2));
+    return originalResolveFilename.call(this, absolutePath, parent, isMain, options);
+  }
+  return originalResolveFilename.call(this, request, parent, isMain, options);
+};
 Module._extensions['.ts'] = function (module, filename) {
   const source = fs.readFileSync(filename, 'utf8');
   const { outputText } = ts.transpileModule(source, {

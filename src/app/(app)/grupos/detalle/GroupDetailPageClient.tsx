@@ -81,6 +81,7 @@ export default function GroupDetailPageClient() {
       if (!groupId) return;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['group-balance', groupId] }),
         queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
       ]);
     },
@@ -104,6 +105,7 @@ export default function GroupDetailPageClient() {
       if (!groupId) return;
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['group-detail', groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['group-balance', groupId] }),
         queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
       ]);
     },
