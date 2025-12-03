@@ -7,6 +7,7 @@ import { getSupabaseConfig } from './config';
 export function getServerSupabaseClient() {
   const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
   const requestHeaders = headers();
+  const forwardedHost = requestHeaders.get('host');
 
   Logger.info('Supabase', 'Initializing server component client', {
     hasCookieStore: Boolean(cookies),
@@ -19,10 +20,14 @@ export function getServerSupabaseClient() {
     supabaseKey: supabaseAnonKey,
     options: {
       global: {
-        headers: {
-          'x-client-info': 'appagar-web-ssr',
-          'x-forwarded-host': requestHeaders.get('host') ?? undefined,
-        },
+        headers: forwardedHost
+          ? {
+              'x-client-info': 'appagar-web-ssr',
+              'x-forwarded-host': forwardedHost,
+            }
+          : {
+              'x-client-info': 'appagar-web-ssr',
+            },
       },
       auth: {
         storageKey: 'appagar-auth',
