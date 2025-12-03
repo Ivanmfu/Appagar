@@ -49,16 +49,49 @@ export const createExpenseSchema = baseExpenseSchema.extend({
   createdBy: uuidish,
 });
 
+export type CreateExpenseData = {
+  groupId: string;
+  payerId: string;
+  totalCents: number;
+  currency: string;
+  fxRate: number;
+  shares: { userId: string; shareCents: number }[];
+  note?: string;
+  category?: string;
+  date?: string;
+  createdBy: string;
+};
+
 export const updateExpenseSchema = baseExpenseSchema.extend({
   expenseId: uuidish,
   updatedBy: uuidish,
 });
+
+export type UpdateExpenseData = {
+  expenseId: string;
+  groupId: string;
+  payerId: string;
+  totalCents: number;
+  currency: string;
+  fxRate: number;
+  shares: { userId: string; shareCents: number }[];
+  note?: string;
+  category?: string;
+  date?: string;
+  updatedBy: string;
+};
 
 export const deleteExpenseSchema = z.object({
   expenseId: uuidish,
   groupId: uuidish,
   deletedBy: uuidish,
 });
+
+export type DeleteExpenseData = {
+  expenseId: string;
+  groupId: string;
+  deletedBy: string;
+};
 
 export const settlementSchema = z.object({
   groupId: uuidish,
@@ -69,6 +102,13 @@ export const settlementSchema = z.object({
     .int('La cantidad debe ser un entero')
     .positive('La cantidad a liquidar debe ser mayor que cero'),
 });
+
+export type SettlementData = {
+  groupId: string;
+  fromUserId: string;
+  toUserId: string;
+  amountMinor: number;
+};
 
 const nameSchema = z
   .string({ required_error: 'El nombre es obligatorio' })
@@ -85,39 +125,40 @@ const passwordSchema = z
   .string({ required_error: 'La contraseña es obligatoria' })
   .min(8, 'La contraseña debe tener al menos 8 caracteres');
 
-export function validateCreateExpenseInput(input: unknown) {
+export function validateCreateExpenseInput(input: unknown): CreateExpenseData {
   const result = createExpenseSchema.safeParse(input);
   if (!result.success) {
     throw AppError.validation(result.error.issues[0]?.message ?? 'Datos del gasto inválidos', result.error);
   }
-  return result.data;
+  return result.data as unknown as CreateExpenseData;
 }
 
-export function validateUpdateExpenseInput(input: unknown) {
+export function validateUpdateExpenseInput(input: unknown): UpdateExpenseData {
   const result = updateExpenseSchema.safeParse(input);
   if (!result.success) {
     throw AppError.validation(result.error.issues[0]?.message ?? 'Datos del gasto inválidos', result.error);
   }
-  return result.data;
+  return result.data as unknown as UpdateExpenseData;
 }
 
-export function validateDeleteExpenseInput(input: unknown) {
+export function validateDeleteExpenseInput(input: unknown): DeleteExpenseData {
   const result = deleteExpenseSchema.safeParse(input);
   if (!result.success) {
     throw AppError.validation(result.error.issues[0]?.message ?? 'Datos del gasto inválidos', result.error);
   }
-  return result.data;
+  return result.data as unknown as DeleteExpenseData;
 }
 
-export function validateSettlementInput(input: unknown) {
+export function validateSettlementInput(input: unknown): SettlementData {
   const result = settlementSchema.safeParse(input);
   if (!result.success) {
     throw AppError.validation(result.error.issues[0]?.message ?? 'Datos de liquidación inválidos', result.error);
   }
-  if (result.data.fromUserId === result.data.toUserId) {
+  const data = result.data as unknown as SettlementData;
+  if (data.fromUserId === data.toUserId) {
     throw AppError.validation('La liquidación requiere dos personas distintas');
   }
-  return result.data;
+  return data;
 }
 
 export function normalizeNameInput(value: string | undefined | null) {
@@ -134,7 +175,8 @@ export function normalizeEmailInput(value: string) {
   if (!result.success) {
     throw AppError.validation(result.error.issues[0]?.message ?? 'Correo inválido', result.error);
   }
-  return result.data.trim().toLowerCase();
+  const parsed = result.data ?? '';
+  return parsed.trim().toLowerCase();
 }
 
 export function validatePasswordInput(value: string) {
@@ -142,5 +184,5 @@ export function validatePasswordInput(value: string) {
   if (!result.success) {
     throw AppError.validation(result.error.issues[0]?.message ?? 'Contraseña inválida', result.error);
   }
-  return result.data;
+  return result.data ?? value;
 }
