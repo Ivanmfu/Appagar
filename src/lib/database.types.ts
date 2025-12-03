@@ -341,6 +341,10 @@ export interface Database {
       group_balance: {
         Row: {
           group_id: string
+          settlements_paid_minor: number | null
+          settlements_received_minor: number | null
+          total_owed_minor: number | null
+          total_paid_minor: number | null
           user_id: string
           net_minor: number
         }
