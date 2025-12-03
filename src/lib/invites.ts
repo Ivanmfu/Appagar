@@ -4,6 +4,10 @@ import type { Database } from '@/lib/database.types';
 const INVITE_EXPIRATION_HOURS = 48;
 
 type GroupInviteRow = Database['public']['Tables']['group_invites']['Row'];
+type InviteSummaryRow = Pick<
+  GroupInviteRow,
+  'id' | 'group_id' | 'receiver_email' | 'email' | 'status' | 'token' | 'expires_at' | 'created_at'
+>;
 type Nullable<T> = T | null;
 
 type ProfileSummary = {
@@ -152,7 +156,7 @@ export async function fetchPendingInvitesForEmail(email: string): Promise<Pendin
 
   if (error) throw error;
 
-  return (data ?? []).map((row) => ({
+  return (data ?? []).map((row: InviteSummaryRow) => ({
     id: row.id,
     groupId: row.group_id,
     receiverEmail: row.receiver_email ?? row.email ?? null,

@@ -5,10 +5,21 @@ import { logActivity } from '@/lib/activity';
 import type { Database } from '@/lib/database.types';
 
 type GroupRow = Database['public']['Tables']['groups']['Row'];
+type GroupSummaryRow = Pick<GroupRow, 'id' | 'name' | 'base_currency' | 'created_at'>;
 type GroupMemberRow = Database['public']['Tables']['group_members']['Row'];
+type MemberSummaryRow = Pick<GroupMemberRow, 'group_id' | 'user_id'>;
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+type ProfileSummaryRow = Pick<ProfileRow, 'id' | 'email' | 'display_name'>;
 type ExpenseRow = Database['public']['Tables']['expenses']['Row'];
+type ExpenseIdRow = Pick<ExpenseRow, 'id'>;
+type ExpenseSummaryRow = Pick<
+  ExpenseRow,
+  'id' | 'group_id' | 'payer_id' | 'date' | 'created_at' | 'amount_base_minor' | 'amount_minor'
+>;
 type ExpenseParticipantRow = Database['public']['Tables']['expense_participants']['Row'];
+type SettlementRow = Database['public']['Tables']['settlements']['Row'];
+type SettlementSummaryRow = Pick<SettlementRow, 'group_id' | 'from_user_id' | 'to_user_id' | 'amount_minor'>;
+type GroupInviteRow = Database['public']['Tables']['group_invites']['Row'];
 
 type Nullable<T> = T | null;
 
@@ -108,10 +119,10 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
 
   Logger.debug('GroupsData', 'Membership query success', {
     count: (membershipRows ?? []).length,
-    groupIds: (membershipRows ?? []).map((row) => row.group_id),
+    groupIds: (membershipRows ?? []).map((row: { group_id: string }) => row.group_id),
   });
 
-  const groupIds = (membershipRows ?? []).map((row) => row.group_id);
+  const groupIds = (membershipRows ?? []).map((row: { group_id: string }) => row.group_id);
   if (groupIds.length === 0) {
     return [];
   }
@@ -149,7 +160,7 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     throw expensesError;
   }
 
-  const expenseIds = (expenseRows ?? []).map((row) => row.id);
+  const expenseIds = (expenseRows ?? []).map((row: ExpenseSummaryRow) => row.id);
 
   const { data: participantRows, error: participantError } = expenseIds.length
     ? await supabase
@@ -164,7 +175,7 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   }
 
   const memberCountMap = new Map<string, number>();
-  (memberRows ?? []).forEach((row) => {
+  (memberRows ?? []).forEach((row: MemberSummaryRow) => {
     memberCountMap.set(row.group_id, (memberCountMap.get(row.group_id) ?? 0) + 1);
   });
 
@@ -217,13 +228,15 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     return groupMap.get(memberId)!;
   };
 
-  (groupIds ?? []).forEach((groupId) => {
+  (groupIds ?? []).forEach((groupId: string) => {
     ensureUserEntry(groupId, userId) ?? undefined;
   });
 
-  const expenseById = new Map((expenseRows ?? []).map((expense) => [expense.id, expense] as const));
+  const expenseById = new Map<string, ExpenseSummaryRow>(
+    (expenseRows ?? []).map((expense: ExpenseSummaryRow) => [expense.id, expense] as const)
+  );
 
-  (expenseRows ?? []).forEach((expense) => {
+  (expenseRows ?? []).forEach((expense: ExpenseSummaryRow) => {
     const amountMinor = expense.amount_base_minor ?? expense.amount_minor ?? 0;
     const paidEntry = ensureUserEntry(expense.group_id, expense.payer_id);
     if (paidEntry) {
@@ -232,7 +245,7 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   });
 
   const participantList = (participantRows ?? []) as ExpenseParticipantRow[];
-  participantList.forEach((participant) => {
+  participantList.forEach((participant: ExpenseParticipantRow) => {
     if (participant.is_included === false) return;
     const expense = expenseById.get(participant.expense_id);
     if (!expense) return;
@@ -247,14 +260,14 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
         .from('settlements')
         .select('group_id, from_user_id, to_user_id, amount_minor')
         .in('group_id', groupIds)
-    : { data: [] as { group_id: string | null; from_user_id: string; to_user_id: string; amount_minor: number }[], error: null };
+    : { data: [] as SettlementSummaryRow[], error: null };
 
   if (settlementError) {
     Logger.error('GroupsData', 'Settlements query failed', { settlementError });
     throw settlementError;
   }
 
-  (settlementRows ?? []).forEach((settlement) => {
+  (settlementRows ?? []).forEach((settlement: SettlementSummaryRow) => {
     if (!settlement.group_id) return;
     const amount = settlement.amount_minor ?? 0;
     if (amount <= 0) return;
@@ -277,7 +290,7 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
     }
   });
 
-  const result = (groupRows ?? []).map((group) => ({
+  const result = (groupRows ?? []).map((group: GroupSummaryRow) => ({
     id: group.id,
     name: group.name,
     baseCurrency: group.base_currency,
@@ -289,7 +302,7 @@ export async function fetchUserGroups(userId: string): Promise<GroupSummary[]> {
   }));
   Logger.debug('GroupsData', 'fetchUserGroups complete', {
     count: result.length,
-    ids: result.map((item) => item.id),
+    ids: result.map((item: GroupSummary) => item.id),
   });
   return result;
 }
@@ -367,9 +380,9 @@ export async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
 
   if (profilesRes.error) throw profilesRes.error;
 
-  const profileMap = new Map<string, ProfileRow>();
-  (profilesRes.data ?? []).forEach((profile) => {
-    profileMap.set(profile.id, profile as ProfileRow);
+  const profileMap = new Map<string, ProfileSummaryRow>();
+  (profilesRes.data ?? []).forEach((profile: ProfileSummaryRow) => {
+    profileMap.set(profile.id, profile as ProfileSummaryRow);
   });
 
   const members: GroupMember[] = memberRows
@@ -416,7 +429,7 @@ export async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
     } satisfies GroupExpense;
   });
 
-  const invites: GroupInvite[] = (invitesRes.data ?? []).map((row) => ({
+  const invites: GroupInvite[] = (invitesRes.data ?? []).map((row: GroupInviteRow) => ({
     id: row.id,
     groupId: row.group_id,
     receiverEmail: row.receiver_email ?? row.email ?? null,
@@ -493,18 +506,19 @@ export async function fetchUserDebtRelations(userId: string): Promise<UserDebtRe
         .from('profiles')
         .select('id, display_name, email')
         .in('id', Array.from(profileIds))
-    : { data: [] as ProfileRow[], error: null };
+    : { data: [] as ProfileSummaryRow[], error: null };
 
   if (profileRes.error) {
     throw profileRes.error;
   }
 
-  const profileMap = new Map<string, ProfileRow>();
-  (profileRes.data ?? []).forEach((profile) => {
-    profileMap.set(profile.id, profile as ProfileRow);
+  const profileMap = new Map<string, ProfileSummaryRow>();
+  (profileRes.data ?? []).forEach((profile: ProfileSummaryRow) => {
+    profileMap.set(profile.id, profile as ProfileSummaryRow);
   });
 
-  const fallbackName = (profile: ProfileRow | undefined) => profile?.display_name ?? profile?.email ?? 'Integrante';
+  const fallbackName = (profile: ProfileSummaryRow | undefined) =>
+    profile?.display_name ?? profile?.email ?? 'Integrante';
 
   const relations = rawRelations.map((relation) => {
     const summary = metaByGroup.get(relation.groupId);
@@ -693,7 +707,7 @@ export async function deleteGroup({ groupId, actorId }: { groupId: string; actor
 
   if (expensesError) throw expensesError;
 
-  const expenseIds = (expenseRows ?? []).map((row) => row.id);
+  const expenseIds = (expenseRows ?? []).map((row: ExpenseIdRow) => row.id);
 
   if (expenseIds.length > 0) {
     const { error: participantsError } = await supabase
