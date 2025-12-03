@@ -78,3 +78,10 @@ La forma más sencilla de desplegar un proyecto Next.js sigue siendo [Vercel](ht
 ## Notas de autenticación
 
 - 2025-11-20: `AuthGate` ahora registra el `userId` junto al correo al detectar sesiones e `src/lib/groups.ts` lista los `groupIds` retornados. Estos logs adicionales ayudan a depurar diferencias entre la sesión activa y los registros de membresías en Supabase.
+
+## Notas de base de datos
+
+- 2025-11-27: se añaden restricciones en `public.transactions` para exigir `amount` siempre presente y no negativo (según el campo `type`) y un trigger (`ensure_account_balance_non_negative`) que aborta inserciones/actualizaciones si el saldo de la cuenta quedaría por debajo de cero. Tras actualizar el repositorio, ejecuta las migraciones de Supabase para aplicar estos cambios:
+  ```bash
+  supabase db push
+  ```

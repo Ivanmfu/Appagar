@@ -29,10 +29,26 @@ export class AppError extends Error {
 
   static fromSupabase(error: unknown, fallback: string) {
     if (error instanceof AppError) return error;
-    const message =
-      (typeof error === 'object' && error && 'message' in error && typeof (error as { message?: unknown }).message === 'string'
+    const rawMessage =
+      typeof error === 'object' && error && 'message' in error && typeof (error as { message?: unknown }).message === 'string'
         ? (error as { message: string }).message
-        : undefined) || fallback;
+        : undefined;
+
+    const pgCode =
+      typeof error === 'object' && error && 'code' in error && typeof (error as { code?: unknown }).code === 'string'
+        ? (error as { code: string }).code
+        : undefined;
+
+    if (pgCode === '23514' || pgCode === 'P0001') {
+      const details =
+        typeof error === 'object' && error && 'details' in error && typeof (error as { details?: unknown }).details === 'string'
+          ? (error as { details: string }).details
+          : undefined;
+      const message = rawMessage ?? details ?? fallback;
+      return AppError.validation(message, error);
+    }
+
+    const message = rawMessage ?? fallback;
     return new AppError('supabase_error', message, error);
   }
 
