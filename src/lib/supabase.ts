@@ -56,6 +56,27 @@ export function getSupabaseClient(): Supabase {
       const existingRaw = typeof window !== 'undefined' ? window.localStorage.getItem('appagar-auth') : null;
       if (existingRaw) {
         Logger.debug('Supabase', 'Found persisted session snapshot', { length: existingRaw.length });
+        try {
+          const parsed = JSON.parse(existingRaw);
+          const sess = parsed?.currentSession ?? parsed?.session ?? parsed;
+          // If we have tokens in storage, rehydrate the client asynchronously so
+          // queries that run immediately after initialization have the token.
+          if (sess && sess.access_token && sess.refresh_token) {
+            // non-blocking rehydrate
+            globalForSupabase.__supabaseClient.auth
+              .setSession({ access_token: sess.access_token, refresh_token: sess.refresh_token })
+              .then(({ data, error }) => {
+                if (error) {
+                  Logger.warn('Supabase', 'Failed rehydrating session into client', { error });
+                } else {
+                  Logger.debug('Supabase', 'Rehydrated session into client', { hasSession: !!data?.session });
+                }
+              })
+              .catch((err) => Logger.error('Supabase', 'Unexpected error rehydrating session', { err }));
+          }
+        } catch (e) {
+          Logger.warn('Supabase', 'Failed parsing persisted session', { err: e });
+        }
       } else {
         Logger.debug('Supabase', 'No persisted session found');
       }

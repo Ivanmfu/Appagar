@@ -15,7 +15,6 @@ import {
   useRef,
   useState,
 } from 'react';
-
 type StorageSource = 'localStorage' | 'sessionStorage';
 
 type Profile = {
@@ -33,7 +32,6 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
 function findPkceVerifier(): { key: string; value: string; source: StorageSource } | null {
   if (typeof window === 'undefined') {
     return null;
