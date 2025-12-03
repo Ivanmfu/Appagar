@@ -3,7 +3,7 @@
 import { linkPendingGroupInvitesToUser } from '@/lib/invites';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Logger, withTiming } from '@/lib/logger';
-import type { Session, User } from '@supabase/supabase-js';
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import {
@@ -325,7 +325,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (
+      event: AuthChangeEvent,
+      newSession: Session | null
+    ) => {
       if (!isMounted) return;
       Logger.info('Auth', 'Auth state change', { event, hasSession: !!newSession });
       
