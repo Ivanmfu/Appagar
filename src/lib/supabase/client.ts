@@ -2,6 +2,7 @@ import { createBrowserClient } from '@supabase/auth-helpers-nextjs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { Logger, maskKey } from '../logger';
 import { Database } from '../database.types';
+import { getSupabaseConfig } from './config';
 
 type Supabase = SupabaseClient<Database>;
 
@@ -15,27 +16,10 @@ const globalForSupabase = globalThis as typeof globalThis & {
 };
 
 export function getSupabaseClient(): Supabase {
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL;
-  const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_KEY;
+  const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
   const publicServiceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const isBrowser = typeof window !== 'undefined';
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    if (!globalForSupabase.__supabaseClient) {
-      Logger.warn('Supabase', 'Missing public Supabase env vars during SSR – returning stub client');
-      globalForSupabase.__supabaseClient = new Proxy({} as Supabase, {
-        get() {
-          throw new Error(
-            'Supabase client unavailable without NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY'
-          );
-        },
-      });
-    }
-    return globalForSupabase.__supabaseClient;
-  }
 
   if (publicServiceRoleKey) {
     throw new Error('The Supabase service role key must never be exposed via NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY.');
