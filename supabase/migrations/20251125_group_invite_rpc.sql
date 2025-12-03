@@ -1,4 +1,6 @@
--- RPC to handle group invite acceptance/decline atomically
+-- Drop the RPC first to avoid ownership/arg mismatch conflicts on re-deploys
+drop function if exists public.respond_group_invite(uuid, text);
+
 create or replace function public.respond_group_invite(
   p_invite_id uuid,
   p_action text
