@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Logger, maskKey } from './logger';
-import { Database } from './database.types';
+import { Logger, maskKey } from '../logger';
+import { Database } from '../database.types';
 
 type Supabase = SupabaseClient<Database>;
 
@@ -13,20 +13,34 @@ const globalForSupabase = globalThis as typeof globalThis & {
   __supabaseClient?: Supabase;
 };
 
+function assertServiceKeyNotUsed(publicKey: string | undefined, serviceKey: string | undefined) {
+  if (!serviceKey) return;
+  Logger.warn('Supabase', 'Service role key detected in client environment; it will not be used', {
+    serviceKeyMasked: maskKey(serviceKey),
+  });
+  if (publicKey && publicKey === serviceKey) {
+    throw new Error('The Supabase service role key cannot be used in the client. Provide the anon key instead.');
+  }
+}
+
 export function getSupabaseClient(): Supabase {
   const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL;
   const supabaseAnonKey =
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_KEY;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      'Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables'
-    );
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables');
   }
 
+  assertServiceKeyNotUsed(supabaseAnonKey, serviceRoleKey);
+
   if (!globalForSupabase.__supabaseClient) {
-    Logger.info('Supabase', 'Initializing client', { urlPresent: Boolean(supabaseUrl), anonKeyMasked: maskKey(supabaseAnonKey) });
+    Logger.info('Supabase', 'Initializing client', {
+      urlPresent: Boolean(supabaseUrl),
+      anonKeyMasked: maskKey(supabaseAnonKey),
+    });
     globalForSupabase.__supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
@@ -90,3 +104,5 @@ export function getSupabaseClient(): Supabase {
 
   return globalForSupabase.__supabaseClient;
 }
+
+export type { Supabase };
