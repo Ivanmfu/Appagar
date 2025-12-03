@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/components/AuthGate';
+import { AppError, getUserMessage } from '@/lib/errors';
 import type { GroupExpense, GroupMember } from '@/lib/groups';
 import { createExpense, updateExpense, deleteExpense } from '@/lib/expenses';
 import { splitEvenlyInCents } from '@/lib/money';
@@ -161,20 +162,20 @@ export function CreateExpenseForm({
     mutationFn: async () => {
       setError(null);
       if (!amount.trim()) {
-        throw new Error('Introduce un importe');
+        throw AppError.validation('Introduce un importe');
       }
 
       if (!user?.id) {
-        throw new Error('Necesitas iniciar sesión para registrar un gasto');
+        throw AppError.authRequired('Necesitas iniciar sesión para registrar un gasto');
       }
 
       const parsedAmount = Number.parseFloat(amount.replace(',', '.'));
       if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-        throw new Error('Introduce un importe válido');
+        throw AppError.validation('Introduce un importe válido');
       }
 
       if (participantIds.length === 0) {
-        throw new Error('Selecciona al menos un participante');
+        throw AppError.validation('Selecciona al menos un participante');
       }
 
       const totalCents = Math.round(parsedAmount * 100);
@@ -185,11 +186,11 @@ export function CreateExpenseForm({
         shares = participantIds.map((id) => {
           const rawValue = customShares[id];
           if (!rawValue || !rawValue.trim()) {
-            throw new Error('Completa el importe para cada participante en el reparto personalizado');
+            throw AppError.validation('Completa el importe para cada participante en el reparto personalizado');
           }
           const parsedShare = Number.parseFloat(rawValue.replace(',', '.'));
           if (!Number.isFinite(parsedShare) || parsedShare < 0) {
-            throw new Error('Introduce importes válidos en el reparto personalizado');
+            throw AppError.validation('Introduce importes válidos en el reparto personalizado');
           }
           const shareCents = Math.round(parsedShare * 100);
           assignedTotal += shareCents;
@@ -198,7 +199,7 @@ export function CreateExpenseForm({
 
         const difference = totalCents - assignedTotal;
         if (Math.abs(difference) > 1) {
-          throw new Error('El reparto personalizado debe sumar exactamente el total del gasto');
+          throw AppError.validation('El reparto personalizado debe sumar exactamente el total del gasto');
         }
         if (shares.length > 0 && difference !== 0) {
           shares[shares.length - 1].shareCents += difference;
@@ -252,8 +253,7 @@ export function CreateExpenseForm({
       onSuccess?.();
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'No se pudo registrar el gasto';
-      setError(message);
+      setError(getUserMessage(err, 'No se pudo registrar el gasto'));
     },
   });
 
@@ -261,10 +261,10 @@ export function CreateExpenseForm({
     mutationFn: async () => {
       setError(null);
       if (!user?.id) {
-        throw new Error('Necesitas iniciar sesión para eliminar un gasto');
+        throw AppError.authRequired('Necesitas iniciar sesión para eliminar un gasto');
       }
       if (!expense) {
-        throw new Error('No se encontró el gasto a eliminar');
+        throw AppError.notFound('No se encontró el gasto a eliminar');
       }
       await deleteExpense({
         expenseId: expense.id,
@@ -282,8 +282,7 @@ export function CreateExpenseForm({
       onSuccess?.();
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'No se pudo eliminar el gasto';
-      setError(message);
+      setError(getUserMessage(err, 'No se pudo eliminar el gasto'));
     },
   });
 
