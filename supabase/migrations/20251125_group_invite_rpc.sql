@@ -1,84 +1,102 @@
--- Drop the RPC first to avoid ownership/arg mismatch conflicts on re-deploys
-drop function if exists public.respond_group_invite(uuid, text);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'group_invites'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'group_members'
+  ) THEN
+    -- Drop the RPC first to avoid ownership/arg mismatch conflicts on re-deploys
+    DROP FUNCTION IF EXISTS public.respond_group_invite(uuid, text);
 
-create or replace function public.respond_group_invite(
-  p_invite_id uuid,
-  p_action text
-)
-returns public.group_invites
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_invite public.group_invites%rowtype;
-  v_member public.group_members%rowtype;
-  v_user_id uuid;
-begin
-  v_user_id := auth.uid();
-  if v_user_id is null then
-    raise exception 'Authentication required';
-  end if;
+    CREATE OR REPLACE FUNCTION public.respond_group_invite(
+      p_invite_id uuid,
+      p_action text
+    )
+    RETURNS public.group_invites
+    LANGUAGE plpgsql
+    SECURITY DEFINER
+    SET search_path = public
+    AS $$
+    DECLARE
+      v_invite public.group_invites%rowtype;
+      v_member public.group_members%rowtype;
+      v_user_id uuid;
+    BEGIN
+      v_user_id := auth.uid();
+      IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Authentication required';
+      END IF;
 
-  if p_action not in ('accept', 'decline') then
-    raise exception 'Invalid invite action: %', p_action;
-  end if;
+      IF p_action NOT IN ('accept', 'decline') THEN
+        RAISE EXCEPTION 'Invalid invite action: %', p_action;
+      END IF;
 
-  select * into v_invite
-  from public.group_invites
-  where id = p_invite_id
-  for update;
+      SELECT * INTO v_invite
+      FROM public.group_invites
+      WHERE id = p_invite_id
+      FOR UPDATE;
 
-  if not found then
-    raise exception 'Invite not found';
-  end if;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Invite not found';
+      END IF;
 
-  if v_invite.receiver_id is not null and v_invite.receiver_id <> v_user_id then
-    raise exception 'Invite belongs to another user';
-  end if;
+      IF v_invite.receiver_id IS NOT NULL AND v_invite.receiver_id <> v_user_id THEN
+        RAISE EXCEPTION 'Invite belongs to another user';
+      END IF;
 
-  if p_action = 'accept' then
-    if v_invite.status <> 'pending' then
-      raise exception 'Invite is no longer pending';
-    end if;
+      IF p_action = 'accept' THEN
+        IF v_invite.status <> 'pending' THEN
+          RAISE EXCEPTION 'Invite is no longer pending';
+        END IF;
 
-    select *
-    into v_member
-    from public.group_members
-    where group_id = v_invite.group_id
-      and user_id = v_user_id
-    for update;
+        SELECT *
+        INTO v_member
+        FROM public.group_members
+        WHERE group_id = v_invite.group_id
+          AND user_id = v_user_id
+        FOR UPDATE;
 
-    if not found then
-      insert into public.group_members (group_id, user_id, is_active)
-      values (v_invite.group_id, v_user_id, true)
-      on conflict (group_id, user_id)
-        do update set is_active = true
-      returning * into v_member;
-    elsif coalesce(v_member.is_active, true) = false then
-      update public.group_members
-      set is_active = true
-      where group_id = v_invite.group_id
-        and user_id = v_user_id
-      returning * into v_member;
-    end if;
+        IF NOT FOUND THEN
+          INSERT INTO public.group_members (group_id, user_id, is_active)
+          VALUES (v_invite.group_id, v_user_id, true)
+          ON CONFLICT (group_id, user_id)
+            DO UPDATE SET is_active = true
+          RETURNING * INTO v_member;
+        ELSIF coalesce(v_member.is_active, true) = false THEN
+          UPDATE public.group_members
+          SET is_active = true
+          WHERE group_id = v_invite.group_id
+            AND user_id = v_user_id
+          RETURNING * INTO v_member;
+        END IF;
 
-    update public.group_invites
-    set status = 'accepted', receiver_id = v_user_id
-    where id = p_invite_id
-    returning * into v_invite;
-  else
-    update public.group_invites
-    set status = 'declined', receiver_id = v_user_id
-    where id = p_invite_id
-    returning * into v_invite;
-  end if;
+        UPDATE public.group_invites
+        SET status = 'accepted', receiver_id = v_user_id
+        WHERE id = p_invite_id
+        RETURNING * INTO v_invite;
+      ELSE
+        UPDATE public.group_invites
+        SET status = 'declined', receiver_id = v_user_id
+        WHERE id = p_invite_id
+        RETURNING * INTO v_invite;
+      END IF;
 
-  return v_invite;
-end;
-$$;
+      RETURN v_invite;
+    END;
+    $$;
 
-comment on function public.respond_group_invite(uuid, text)
-  is 'Handles accepting or declining a group invite atomically with membership adjustments.';
+    COMMENT ON FUNCTION public.respond_group_invite(uuid, text)
+      IS 'Handles accepting or declining a group invite atomically with membership adjustments.';
 
-grant execute on function public.respond_group_invite(uuid, text) to authenticated;
+    GRANT EXECUTE ON FUNCTION public.respond_group_invite(uuid, text) TO authenticated;
+  ELSE
+    RAISE NOTICE 'Skipping respond_group_invite creation: group_invites or group_members missing';
+  END IF;
+END $$;
