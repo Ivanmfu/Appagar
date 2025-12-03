@@ -245,67 +245,12 @@ export async function respondToGroupInvite({
   }
 
   const supabase = getSupabaseClient();
-  const { data: invite, error: inviteError } = await supabase
-    .from('group_invites')
-    .select('id, group_id, receiver_id, status')
-    .eq('id', inviteId)
-    .maybeSingle();
+  const { error } = await supabase.rpc('respond_group_invite', {
+    p_invite_id: inviteId,
+    p_action: action,
+  });
 
-  if (inviteError) throw inviteError;
-  if (!invite) {
-    throw new Error('La invitación ya no está disponible.');
-  }
-  if (invite.receiver_id && invite.receiver_id !== userId) {
-    throw new Error('Esta invitación pertenece a otra persona.');
-  }
-
-  if (action === 'accept') {
-    if (invite.status !== 'pending') {
-      throw new Error('Esta invitación ya fue gestionada.');
-    }
-
-    const { data: member, error: memberFetchError } = await supabase
-      .from('group_members')
-      .select('group_id, user_id, is_active')
-      .eq('group_id', invite.group_id)
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (memberFetchError) throw memberFetchError;
-
-    if (!member) {
-      const { error: insertMemberError } = await supabase
-        .from('group_members')
-        .insert({
-          group_id: invite.group_id,
-          user_id: userId,
-          is_active: true,
-        });
-      if (insertMemberError) throw insertMemberError;
-    } else if (!member.is_active) {
-      const { error: reactivateError } = await supabase
-        .from('group_members')
-        .update({ is_active: true })
-        .eq('group_id', invite.group_id)
-        .eq('user_id', userId);
-      if (reactivateError) throw reactivateError;
-    }
-
-    const { error: updateError } = await supabase
-      .from('group_invites')
-      .update({ status: 'accepted', receiver_id: userId })
-      .eq('id', inviteId);
-
-    if (updateError) throw updateError;
-    return;
-  }
-
-  const { error: declineError } = await supabase
-    .from('group_invites')
-    .update({ status: 'declined', receiver_id: userId })
-    .eq('id', inviteId);
-
-  if (declineError) throw declineError;
+  if (error) throw error;
 }
 
 export async function acceptInvite({ token, userId }: { token: string; userId: string }) {
@@ -323,41 +268,17 @@ export async function acceptInvite({ token, userId }: { token: string; userId: s
     throw new Error('Esta invitación pertenece a otra cuenta');
   }
 
-  const { data: member, error: memberFetchError } = await supabase
-    .from('group_members')
-    .select('group_id, user_id, is_active')
-    .eq('group_id', invite.group_id)
-    .eq('user_id', userId)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('respond_group_invite', {
+    p_invite_id: invite.id,
+    p_action: 'accept',
+  });
 
-  if (memberFetchError) throw memberFetchError;
-
-  if (!member) {
-    const { error: insertMemberError } = await supabase
-      .from('group_members')
-      .insert({
-        group_id: invite.group_id,
-        user_id: userId,
-        is_active: true,
-      });
-    if (insertMemberError) throw insertMemberError;
-  } else if (!member.is_active) {
-    const { error: reactivateError } = await supabase
-      .from('group_members')
-      .update({ is_active: true })
-      .eq('group_id', invite.group_id)
-      .eq('user_id', userId);
-    if (reactivateError) throw reactivateError;
+  if (error) throw error;
+  if (!data) {
+    throw new Error('No se pudo aceptar la invitación.');
   }
 
-  const { error: updateInviteError } = await supabase
-    .from('group_invites')
-    .update({ status: 'accepted', receiver_id: userId })
-    .eq('id', invite.id);
-
-  if (updateInviteError) throw updateInviteError;
-
-  return invite.group_id;
+  return data.group_id;
 }
 
 export async function revokeInvite(inviteId: string) {
