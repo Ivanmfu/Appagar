@@ -1,6 +1,8 @@
 DO $$
+DECLARE
+  v_has_tables boolean;
 BEGIN
-  IF EXISTS (
+  SELECT EXISTS (
     SELECT 1
     FROM information_schema.tables
     WHERE table_schema = 'public'
@@ -11,10 +13,19 @@ BEGIN
     FROM information_schema.tables
     WHERE table_schema = 'public'
       AND table_name = 'group_members'
-  ) THEN
-    -- Drop the RPC first to avoid ownership/arg mismatch conflicts on re-deploys
-    DROP FUNCTION IF EXISTS public.respond_group_invite(uuid, text);
+  )
+  INTO v_has_tables;
 
+  IF NOT v_has_tables THEN
+    RAISE NOTICE 'Skipping respond_group_invite creation: group_invites or group_members missing';
+    RETURN;
+  END IF;
+
+  -- Use dynamic SQL so parsing succeeds even when running migrations on databases
+  -- that temporarily lack the referenced composite types.
+  EXECUTE 'DROP FUNCTION IF EXISTS public.respond_group_invite(uuid, text)';
+
+  EXECUTE $$
     CREATE OR REPLACE FUNCTION public.respond_group_invite(
       p_invite_id uuid,
       p_action text
@@ -23,7 +34,7 @@ BEGIN
     LANGUAGE plpgsql
     SECURITY DEFINER
     SET search_path = public
-    AS $$
+    AS '
     DECLARE
       v_invite public.group_invites%rowtype;
       v_member public.group_members%rowtype;
@@ -31,11 +42,11 @@ BEGIN
     BEGIN
       v_user_id := auth.uid();
       IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'Authentication required';
+        RAISE EXCEPTION ''Authentication required'';
       END IF;
 
-      IF p_action NOT IN ('accept', 'decline') THEN
-        RAISE EXCEPTION 'Invalid invite action: %', p_action;
+      IF p_action NOT IN (''accept'', ''decline'') THEN
+        RAISE EXCEPTION ''Invalid invite action: %'', p_action;
       END IF;
 
       SELECT * INTO v_invite
@@ -44,16 +55,16 @@ BEGIN
       FOR UPDATE;
 
       IF NOT FOUND THEN
-        RAISE EXCEPTION 'Invite not found';
+        RAISE EXCEPTION ''Invite not found'';
       END IF;
 
       IF v_invite.receiver_id IS NOT NULL AND v_invite.receiver_id <> v_user_id THEN
-        RAISE EXCEPTION 'Invite belongs to another user';
+        RAISE EXCEPTION ''Invite belongs to another user'';
       END IF;
 
-      IF p_action = 'accept' THEN
-        IF v_invite.status <> 'pending' THEN
-          RAISE EXCEPTION 'Invite is no longer pending';
+      IF p_action = ''accept'' THEN
+        IF v_invite.status <> ''pending'' THEN
+          RAISE EXCEPTION ''Invite is no longer pending'';
         END IF;
 
         SELECT *
@@ -78,25 +89,23 @@ BEGIN
         END IF;
 
         UPDATE public.group_invites
-        SET status = 'accepted', receiver_id = v_user_id
+        SET status = ''accepted'', receiver_id = v_user_id
         WHERE id = p_invite_id
         RETURNING * INTO v_invite;
       ELSE
         UPDATE public.group_invites
-        SET status = 'declined', receiver_id = v_user_id
+        SET status = ''declined'', receiver_id = v_user_id
         WHERE id = p_invite_id
         RETURNING * INTO v_invite;
       END IF;
 
       RETURN v_invite;
     END;
-    $$;
+    '';
+  $$;
 
-    COMMENT ON FUNCTION public.respond_group_invite(uuid, text)
-      IS 'Handles accepting or declining a group invite atomically with membership adjustments.';
+  COMMENT ON FUNCTION public.respond_group_invite(uuid, text)
+    IS 'Handles accepting or declining a group invite atomically with membership adjustments.';
 
-    GRANT EXECUTE ON FUNCTION public.respond_group_invite(uuid, text) TO authenticated;
-  ELSE
-    RAISE NOTICE 'Skipping respond_group_invite creation: group_invites or group_members missing';
-  END IF;
+  GRANT EXECUTE ON FUNCTION public.respond_group_invite(uuid, text) TO authenticated;
 END $$;
