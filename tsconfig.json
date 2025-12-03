@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@domain/*": [
+        "./src/domain/*"
       ]
     },
     "types": ["node", "react", "react-dom"],
