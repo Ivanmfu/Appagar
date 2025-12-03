@@ -1,2 +1,2 @@
 export { getSupabaseClient } from './client';
-export type { Supabase } from './client';
+export { getServerSupabaseClient } from './server';

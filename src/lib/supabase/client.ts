@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createBrowserClient, type SupabaseClient } from '@supabase/auth-helpers-nextjs';
 import { Logger, maskKey } from '../logger';
 import { Database } from '../database.types';
 
@@ -13,35 +13,36 @@ const globalForSupabase = globalThis as typeof globalThis & {
   __supabaseClient?: Supabase;
 };
 
-function assertServiceKeyNotUsed(publicKey: string | undefined, serviceKey: string | undefined) {
-  if (!serviceKey) return;
-  Logger.warn('Supabase', 'Service role key detected in client environment; it will not be used', {
-    serviceKeyMasked: maskKey(serviceKey),
-  });
-  if (publicKey && publicKey === serviceKey) {
-    throw new Error('The Supabase service role key cannot be used in the client. Provide the anon key instead.');
-  }
-}
-
 export function getSupabaseClient(): Supabase {
   const supabaseUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL;
   const supabaseAnonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_KEY;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+  const publicServiceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables');
   }
 
-  assertServiceKeyNotUsed(supabaseAnonKey, serviceRoleKey);
+  if (publicServiceRoleKey) {
+    throw new Error('The Supabase service role key must never be exposed via NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY.');
+  }
+
+  if (typeof window !== 'undefined' && serviceRoleKey) {
+    throw new Error('The Supabase service role key cannot be loaded in the browser environment.');
+  }
+
+  if (serviceRoleKey && supabaseAnonKey === serviceRoleKey) {
+    throw new Error('The Supabase service role key cannot be used in the client. Provide the anon key instead.');
+  }
 
   if (!globalForSupabase.__supabaseClient) {
     Logger.info('Supabase', 'Initializing client', {
       urlPresent: Boolean(supabaseUrl),
       anonKeyMasked: maskKey(supabaseAnonKey),
     });
-    globalForSupabase.__supabaseClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    globalForSupabase.__supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -49,7 +50,6 @@ export function getSupabaseClient(): Supabase {
         // We handle code-exchange manually to avoid the internal PKCE initialization
         // getting stuck on static hosting (GitHub Pages with basePath).
         detectSessionInUrl: false,
-        storage: typeof window !== 'undefined' ? window.localStorage : undefined,
         storageKey: 'appagar-auth',
       },
       global: {
@@ -67,7 +67,13 @@ export function getSupabaseClient(): Supabase {
       },
     });
     try {
-      const existingRaw = typeof window !== 'undefined' ? window.localStorage.getItem('appagar-auth') : null;
+      const existingRaw = (() => {
+        if (typeof document === 'undefined') return null;
+        const cookies = document.cookie.split(';').map((entry) => entry.trim());
+        const match = cookies.find((cookie) => cookie.startsWith('appagar-auth='));
+        if (!match) return null;
+        return decodeURIComponent(match.split('=')[1] ?? '');
+      })();
       if (existingRaw) {
         Logger.debug('Supabase', 'Found persisted session snapshot', { length: existingRaw.length });
         try {
