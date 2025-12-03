@@ -348,7 +348,13 @@ export interface Database {
       }
     }
     Functions: {
-      [_: string]: never
+      respond_group_invite: {
+        Args: {
+          p_invite_id: string
+          p_action: 'accept' | 'decline'
+        }
+        Returns: Database['public']['Tables']['group_invites']['Row']
+      }
     }
     Enums: {
       [_: string]: never
