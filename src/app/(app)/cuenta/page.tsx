@@ -1,10 +1,8 @@
 'use client';
 
+import { useAccountMutations } from '@domain/accounts';
 import { useAuth } from '@/components/AuthGate';
-import { AppError, getUserMessage } from '@/lib/errors';
-import { getSupabaseClient } from '@/lib/supabase';
-import { normalizeEmailInput, normalizeNameInput, validatePasswordInput } from '@/lib/validation';
-import { useMutation } from '@tanstack/react-query';
+import { getUserMessage } from '@/lib/errors';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
 
@@ -53,120 +51,10 @@ export default function AccountPage() {
   const canSubmitEmail = emailDirty && validEmail;
   const passwordValid = password.length >= 8 && password === confirmPassword;
 
-  const updateNameMutation = useMutation({
-    mutationFn: async (nextDisplayName: string) => {
-      if (!user?.id) {
-        throw AppError.authRequired('Necesitas iniciar sesión para actualizar tu nombre.');
-      }
-
-      const supabase = getSupabaseClient();
-      const value = normalizeNameInput(nextDisplayName);
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ display_name: value })
-        .eq('id', user.id);
-
-      if (profileError) throw AppError.fromSupabase(profileError, 'No se pudo actualizar tu nombre.');
-
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { display_name: value, full_name: value },
-      });
-
-      if (authError) throw AppError.fromSupabase(authError, 'No se pudo actualizar tu nombre.');
-    },
-    onSuccess: async (_, variables) => {
-      setDisplayName(variables);
-      setNameFeedback({ status: 'success', message: 'Tu nombre se ha actualizado correctamente.' });
-      await refresh();
-    },
-    onError: (error: unknown) => {
-      setNameFeedback({
-        status: 'error',
-        message: getUserMessage(error, 'No se pudo actualizar tu nombre.'),
-      });
-    },
-  });
-
-  const updateEmailMutation = useMutation({
-    mutationFn: async (nextEmail: string) => {
-      if (!user?.id) {
-        throw AppError.authRequired('Necesitas iniciar sesión para actualizar tu correo.');
-      }
-
-      const supabase = getSupabaseClient();
-      const value = normalizeEmailInput(nextEmail);
-
-      const { error: authError } = await supabase.auth.updateUser({
-        email: value,
-      });
-
-      if (authError) throw AppError.fromSupabase(authError, 'No se pudo actualizar tu correo.');
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ email: value })
-        .eq('id', user.id);
-
-      if (profileError) throw AppError.fromSupabase(profileError, 'No se pudo actualizar tu correo.');
-
-      return { requiresConfirmation: value !== normalizedCurrentEmail } as const;
-    },
-    onSuccess: async ({ requiresConfirmation }, variables) => {
-      setEmailInput(variables);
-      await refresh();
-      setEmailFeedback({
-        status: 'success',
-        message: requiresConfirmation
-          ? 'Hemos enviado un correo para confirmar la dirección nueva. Revísalo para completar el cambio.'
-          : 'Tu correo se ha actualizado correctamente.',
-      });
-    },
-    onError: (error: unknown) => {
-      setEmailFeedback({
-        status: 'error',
-        message: getUserMessage(error, 'No se pudo actualizar tu correo.'),
-      });
-    },
-  });
-
-  const updatePasswordMutation = useMutation({
-    mutationFn: async (nextPassword: string) => {
-      if (!user?.id) {
-        throw AppError.authRequired('Necesitas iniciar sesión para actualizar tu contraseña.');
-      }
-
-      const supabase = getSupabaseClient();
-      const passwordToSave = validatePasswordInput(nextPassword);
-      const { error } = await supabase.auth.updateUser({
-        password: passwordToSave,
-      });
-
-      if (error) throw AppError.fromSupabase(error, 'No se pudo actualizar tu contraseña.');
-    },
-    onSuccess: async () => {
-      setPassword('');
-      setConfirmPassword('');
-      setPasswordFeedback({
-        status: 'success',
-        message: 'Tu contraseña se ha actualizado. La próxima vez que inicies sesión necesitarás la nueva.',
-      });
-      await refresh();
-    },
-    onError: (error: unknown) => {
-      setPasswordFeedback({
-        status: 'error',
-        message: getUserMessage(error, 'No se pudo actualizar tu contraseña.'),
-      });
-    },
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const supabase = getSupabaseClient();
-      await supabase.auth.signOut();
-    },
-    onSuccess: () => {
+  const { updateNameMutation, updateEmailMutation, updatePasswordMutation, logoutMutation } = useAccountMutations({
+    userId: user?.id,
+    onProfileChanged: refresh,
+    onSessionInvalid: () => {
       refresh();
       router.push('/login');
     },
@@ -176,21 +64,69 @@ export default function AccountPage() {
     event.preventDefault();
     setNameFeedback(null);
     if (!canSubmitName) return;
-    updateNameMutation.mutate(nameCandidate);
+    updateNameMutation.mutate(nameCandidate, {
+      onSuccess: (normalizedName) => {
+        setDisplayName(normalizedName);
+        setNameFeedback({ status: 'success', message: 'Tu nombre se ha actualizado correctamente.' });
+      },
+      onError: (error: unknown) => {
+        setNameFeedback({
+          status: 'error',
+          message: getUserMessage(error, 'No se pudo actualizar tu nombre.'),
+        });
+      },
+    });
   }
 
   function handleEmailSubmit(event: FormEvent) {
     event.preventDefault();
     setEmailFeedback(null);
     if (!canSubmitEmail) return;
-    updateEmailMutation.mutate(normalizedEmailInput);
+    updateEmailMutation.mutate(
+      { nextEmail: normalizedEmailInput, currentEmail: normalizedCurrentEmail },
+      {
+        onSuccess: ({ requiresConfirmation, normalizedEmail }) => {
+          setEmailInput(normalizedEmail);
+          setEmailFeedback({
+            status: 'success',
+            message: requiresConfirmation
+              ? 'Hemos enviado un correo para confirmar la dirección nueva. Revísalo para completar el cambio.'
+              : 'Tu correo se ha actualizado correctamente.',
+          });
+        },
+        onError: (error: unknown) => {
+          setEmailFeedback({
+            status: 'error',
+            message: getUserMessage(error, 'No se pudo actualizar tu correo.'),
+          });
+        },
+      }
+    );
   }
 
   function handlePasswordSubmit(event: FormEvent) {
     event.preventDefault();
     setPasswordFeedback(null);
     if (!passwordValid) return;
-    updatePasswordMutation.mutate(password);
+    updatePasswordMutation.mutate(
+      { password, confirmPassword },
+      {
+        onSuccess: () => {
+          setPassword('');
+          setConfirmPassword('');
+          setPasswordFeedback({
+            status: 'success',
+            message: 'Tu contraseña se ha actualizado. La próxima vez que inicies sesión necesitarás la nueva.',
+          });
+        },
+        onError: (error: unknown) => {
+          setPasswordFeedback({
+            status: 'error',
+            message: getUserMessage(error, 'No se pudo actualizar tu contraseña.'),
+          });
+        },
+      }
+    );
   }
 
   return (

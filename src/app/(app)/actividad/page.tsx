@@ -1,8 +1,7 @@
 'use client';
 
+import { useRecentTransactions, type TransactionActivity } from '@domain/transactions';
 import { useAuth } from '@/components/AuthGate';
-import { fetchActivityFeed, type ActivityFeedItem } from '@/lib/activity';
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 
 const CARD_CLASS = 'glass-card p-6';
@@ -25,7 +24,7 @@ function formatCurrency(minor?: number, currency: string = 'EUR') {
   }).format(minor / 100);
 }
 
-function getActionLabel(action: ActivityFeedItem['action']) {
+function getActionLabel(action: TransactionActivity['action']) {
   switch (action) {
     case 'expense_created':
       return 'Nuevo gasto';
@@ -42,7 +41,7 @@ function getActionLabel(action: ActivityFeedItem['action']) {
   }
 }
 
-function describeActivity(item: ActivityFeedItem) {
+function describeActivity(item: TransactionActivity) {
   const amount = formatCurrency(item.payload.amountMinor, item.payload.currency ?? 'EUR');
   const hasAmount = amount !== '—';
   const note = item.payload.note ? ` «${item.payload.note}»` : '';
@@ -66,15 +65,7 @@ function describeActivity(item: ActivityFeedItem) {
 export default function ActivityPage() {
   const { user } = useAuth();
 
-  const activityQuery = useQuery({
-    queryKey: ['activity', user?.id],
-    enabled: Boolean(user?.id),
-    queryFn: async () => {
-      if (!user?.id) return [] as ActivityFeedItem[];
-      return fetchActivityFeed(user.id);
-    },
-    staleTime: 10_000,
-  });
+  const activityQuery = useRecentTransactions(user?.id ?? null);
 
   const feed = activityQuery.data ?? [];
 
