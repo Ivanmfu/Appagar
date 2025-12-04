@@ -5,7 +5,10 @@ export function isAuthError(error: unknown): boolean {
   if (!error) return false;
 
   if (error instanceof AuthApiError || error instanceof AuthError) return true;
-  if (error instanceof PostgrestError && (error.status === 401 || error.status === 403)) return true;
+  if (error instanceof PostgrestError) {
+    const postgrestStatus = (error as { status?: number })?.status;
+    if (postgrestStatus === 401 || postgrestStatus === 403) return true;
+  }
 
   const status = (error as { status?: number })?.status;
   if (status === 401 || status === 403) return true;

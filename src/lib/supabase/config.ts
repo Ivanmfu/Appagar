@@ -11,7 +11,14 @@ export function getSupabaseConfig() {
   }
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables');
+    const fallbackUrl = process.env.NEXT_PUBLIC_SUPABASE_PLACEHOLDER_URL || 'http://localhost:54321';
+    const fallbackAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PLACEHOLDER_ANON_KEY || 'supabase-anon-placeholder';
+    Logger.warn('Supabase', 'Missing Supabase public environment variables; using placeholder values. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY for production.', {
+      fallbackUrl,
+      anonKeyMasked: maskKey(fallbackAnonKey),
+    });
+
+    return { supabaseUrl: fallbackUrl, supabaseAnonKey: fallbackAnonKey } as const;
   }
 
   if (serviceRoleKey && supabaseAnonKey === serviceRoleKey) {

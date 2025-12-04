@@ -197,8 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         nextSession = refreshed.session;
       }
 
-      const { data: userData, error: userError, status } = await supabase.auth.getUser();
-      if (userError || !userData.user || status === 401) {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
         await handleAuthFailure('user-unavailable');
         return;
       }
@@ -331,13 +331,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!sessionToUse) {
-          const { data, error, status } = await supabase.auth.getSession();
-          Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, status, userId: data.session?.user?.id, email: data.session?.user?.email });
+          const { data, error } = await supabase.auth.getSession();
+          Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, userId: data.session?.user?.id, email: data.session?.user?.email });
 
           if (!isMounted) return;
 
           if (error) {
-            Logger.warn('Auth', 'Error in getSession', { error, status });
+            Logger.warn('Auth', 'Error in getSession', { error });
           }
 
           sessionToUse = data.session;
@@ -352,8 +352,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             sessionToUse = refreshed.session;
           }
 
-          const { data: userData, error: userError, status: userStatus } = await supabase.auth.getUser();
-          if (userError || !userData.user || userStatus === 401) {
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          if (userError || !userData.user) {
             await handleAuthFailure('init-user-missing');
             return;
           }
