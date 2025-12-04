@@ -2,11 +2,42 @@
 import { AuthProvider } from '@/components/AuthGate';
 import DebugOverlay from '@/components/DebugOverlay';
 import { Logger } from '@/lib/logger';
+import { getSupabaseClient } from '@/lib/supabase';
+import { isAuthError } from '@/lib/supabase/auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactNode, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ReactNode, useEffect, useMemo } from 'react';
 
 export default function Providers({ children }: { children: ReactNode }) {
-  const [qc] = useState(() => new QueryClient());
+  const router = useRouter();
+  const supabase = useMemo(() => getSupabaseClient(), []);
+
+  const queryClient = useMemo(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: (failureCount, error) => {
+              if (isAuthError(error)) return false;
+              return failureCount < 3;
+            },
+            onError: async (error) => {
+              if (!isAuthError(error)) return;
+              await supabase.auth.signOut();
+              router.replace('/login');
+            },
+          },
+          mutations: {
+            onError: async (error) => {
+              if (!isAuthError(error)) return;
+              await supabase.auth.signOut();
+              router.replace('/login');
+            },
+          },
+        },
+      }),
+    [router, supabase]
+  );
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const originalFetch = window.fetch;
@@ -38,7 +69,7 @@ export default function Providers({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <QueryClientProvider client={qc}>
+    <QueryClientProvider client={queryClient}>
       <AuthProvider>
         {children}
         <DebugOverlay />
