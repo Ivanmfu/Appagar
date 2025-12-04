@@ -1,8 +1,6 @@
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Database, Json } from '@/lib/database.types';
 
-type ActivityRow = Database['public']['Tables']['activity_events']['Row'];
-
 export type ActivityAction =
 	| 'expense_created'
 	| 'expense_updated'
