@@ -8,6 +8,11 @@ const outDir = join(__dirname, '..', 'out');
 const baseSegment = 'Appagar';
 const routesDir = join(outDir, baseSegment);
 
+if (!existsSync(outDir)) {
+  console.info(`[post-export-fix] Skipping: output directory not found at ${outDir}`);
+  process.exit(0);
+}
+
 function copyTo(sourceName, targetName) {
   const sourcePath = join(outDir, sourceName);
   const targetPath = join(outDir, targetName);
