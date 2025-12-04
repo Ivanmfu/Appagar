@@ -2,6 +2,7 @@
 
 import { linkPendingGroupInvitesToUser } from '@/lib/invites';
 import { getSupabaseClient } from '@/lib/supabase';
+import { isAuthError } from '@/lib/supabase/auth';
 import { Logger, withTiming } from '@/lib/logger';
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { usePathname, useRouter } from 'next/navigation';
@@ -157,6 +158,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const initializedRef = useRef(false);
   const supabase = useMemo(() => getSupabaseClient(), []);
 
+  const handleAuthFailure = useCallback(
+    async (reason: string) => {
+      Logger.warn('Auth', 'Auth failure detected; signing out', { reason });
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        Logger.warn('Auth', 'Error signing out after auth failure', { signOutError });
+      }
+      setSession(null);
+      setProfile(null);
+      setLoading(false);
+      router.replace(loginRoute);
+    },
+    [router, supabase]
+  );
+
   const refresh = useCallback(async () => {
     Logger.info('Auth', 'Manual refresh invoked');
     try {
@@ -168,27 +185,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const nextSession = data.session ?? null;
+      let nextSession = data.session ?? null;
+
+      if (nextSession?.expires_at && nextSession.expires_at * 1000 <= Date.now()) {
+        Logger.info('Auth', 'Session expired during refresh; attempting token refresh');
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshed.session) {
+          await handleAuthFailure('refresh-session-failed');
+          return;
+        }
+        nextSession = refreshed.session;
+      }
+
+      const { data: userData, error: userError, status } = await supabase.auth.getUser();
+      if (userError || !userData.user || status === 401) {
+        await handleAuthFailure('user-unavailable');
+        return;
+      }
+
       setSession(nextSession);
       const ensuredProfile = await withTiming('Auth', 'ensureProfile', () => ensureProfile(nextSession?.user ?? null));
       setProfile(ensuredProfile ?? null);
     } catch (error) {
+      if (isAuthError(error)) {
+        await handleAuthFailure('refresh-exception');
+        return;
+      }
       Logger.error('Auth', 'Unexpected error during refresh', { error });
       setSession(null);
       setProfile(null);
     } finally {
       setLoading(false);
     }
-  }, [supabase]);
+  }, [handleAuthFailure, supabase]);
 
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
 
     let isMounted = true;
-
-    // Safety timeout: force loading=false after 10 seconds
-      // Removed forced timeout fallback
 
     (async () => {
       Logger.info('Auth', 'Initializing');
@@ -296,16 +331,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!sessionToUse) {
-          const { data, error } = await supabase.auth.getSession();
-          Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, userId: data.session?.user?.id, email: data.session?.user?.email });
+          const { data, error, status } = await supabase.auth.getSession();
+          Logger.debug('Auth', 'getSession result', { hasSession: !!data.session, error, status, userId: data.session?.user?.id, email: data.session?.user?.email });
 
           if (!isMounted) return;
 
           if (error) {
-            Logger.warn('Auth', 'Error in getSession', { error });
+            Logger.warn('Auth', 'Error in getSession', { error, status });
           }
 
           sessionToUse = data.session;
+
+          if (sessionToUse?.expires_at && sessionToUse.expires_at * 1000 <= Date.now()) {
+            Logger.info('Auth', 'Session expired during init; refreshing');
+            const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+            if (refreshError || !refreshed.session) {
+              await handleAuthFailure('init-refresh-failed');
+              return;
+            }
+            sessionToUse = refreshed.session;
+          }
+
+          const { data: userData, error: userError, status: userStatus } = await supabase.auth.getUser();
+          if (userError || !userData.user || userStatus === 401) {
+            await handleAuthFailure('init-user-missing');
+            return;
+          }
+
           setSession(sessionToUse);
 
           if (sessionToUse) {
@@ -316,6 +368,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (error) {
+        if (isAuthError(error)) {
+          await handleAuthFailure('init-exception');
+          return;
+        }
         Logger.error('Auth', 'Error in initialize', { error });
       } finally {
         if (isMounted) {
@@ -331,8 +387,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ) => {
       if (!isMounted) return;
       Logger.info('Auth', 'Auth state change', { event, hasSession: !!newSession });
-      
+
       try {
+        if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          if (userError || !userData.user) {
+            await handleAuthFailure('auth-event-user-missing');
+            return;
+          }
+        }
+
         setSession(newSession);
         if (newSession?.user) {
           Logger.debug('Auth', 'ensureProfile on auth event', { email: newSession.user.email });
