@@ -56,14 +56,14 @@ function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
-function _transformKeys<T>(obj: Record<string, unknown>): T {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function transformKeys<T>(obj: Record<string, unknown>): T {
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(obj)) {
     result[snakeToCamel(key)] = obj[key];
   }
   return result as T;
 }
-
 // Table builder
 function createTableBuilder<T>(tableName: string) {
   return {
@@ -123,6 +123,7 @@ function createTableBuilder<T>(tableName: string) {
           const params: unknown[] = [];
           
           if (conditions.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const whereClauses = conditions.map((c, _i) => {
               if (c.op === 'IN') {
                 const inPlaceholders = (c.value as unknown[]).map((_, j) => `$${params.length + j + 1}`).join(', ');
@@ -288,11 +289,13 @@ function createTableBuilder<T>(tableName: string) {
         try {
           const updates = Object.entries(data as object);
           const setClause = updates.map(([key], i) => `${key} = $${i + 1}`).join(', ');
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const params = updates.map(([_key, value]) => value);
           
           let sql = `UPDATE ${tableName} SET ${setClause}`;
           
           if (conditions.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const whereClause = conditions.map((c, _i) => {
               params.push(c.value);
               return `${c.column} = $${params.length}`;
