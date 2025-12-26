@@ -91,7 +91,7 @@ export async function fetchActivityFeed(userId: string | null): Promise<Activity
 	}
 
         const groupIds = Array.from(
-                new Set((membershipRows ?? []).map((row: { group_id: string }) => row.group_id))
+                new Set((membershipRows as { group_id: string }[] ?? []).map((row) => row.group_id))
         );
 
         const filters = [`actor_id.eq.${userId}`];
@@ -110,7 +110,16 @@ export async function fetchActivityFeed(userId: string | null): Promise<Activity
                 throw eventsError;
         }
 
-        const events = (eventsData ?? []).sort((a, b) => {
+        type EventRow = {
+                id: string;
+                group_id: string | null;
+                actor_id: string | null;
+                action: string;
+                payload: Json | null;
+                created_at: string | null;
+        };
+
+        const events = (eventsData as EventRow[] ?? []).sort((a, b) => {
                 const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
                 const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
                 return bTime - aTime;
@@ -153,12 +162,12 @@ export async function fetchActivityFeed(userId: string | null): Promise<Activity
 	}
 
         const profileMap = new Map<string, ProfileLite>();
-        (profilesRes.data ?? []).forEach((profile: ProfileLite) => {
+        (profilesRes.data as ProfileLite[] ?? []).forEach((profile) => {
                 profileMap.set(profile.id, profile);
         });
 
         const groupMap = new Map<string, GroupLite>();
-        (groupsRes.data ?? []).forEach((group: GroupLite) => {
+        (groupsRes.data as GroupLite[] ?? []).forEach((group) => {
                 groupMap.set(group.id, group);
         });
 

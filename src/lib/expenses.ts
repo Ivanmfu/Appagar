@@ -173,7 +173,7 @@ export async function updateExpense({
     shares: parsed.shares,
   });
 
-  const { data: existingExpense, error: fetchExistingError } = await supabase
+  const { data: existingExpenseRaw, error: fetchExistingError } = await supabase
     .from('expenses')
     .select('id, created_by')
     .eq('id', parsed.expenseId)
@@ -181,10 +181,11 @@ export async function updateExpense({
     .maybeSingle();
 
   if (fetchExistingError) throw AppError.fromSupabase(fetchExistingError, 'No se pudo cargar el gasto');
-  if (!existingExpense) {
+  if (!existingExpenseRaw) {
     throw AppError.notFound('El gasto no existe o ya fue eliminado.');
   }
 
+  const existingExpense = existingExpenseRaw as { id: string; created_by: string | null };
   const createdBy = existingExpense.created_by ?? parsed.updatedBy;
 
   const { data: updatedExpense, error: expenseUpdateError } = await supabase
@@ -255,7 +256,7 @@ export async function deleteExpense({ expenseId, groupId, deletedBy }: DeleteExp
   const parsed = validateDeleteExpenseInput({ expenseId, groupId, deletedBy });
   const supabase = getSupabaseClient();
 
-  const { data: existingExpense, error: fetchError } = await supabase
+  const { data: existingExpenseRaw2, error: fetchError } = await supabase
     .from('expenses')
     .select('id, amount_minor, currency, note')
     .eq('id', parsed.expenseId)
@@ -263,9 +264,11 @@ export async function deleteExpense({ expenseId, groupId, deletedBy }: DeleteExp
     .maybeSingle();
 
   if (fetchError) throw AppError.fromSupabase(fetchError, 'No se pudo cargar el gasto');
-  if (!existingExpense) {
+  if (!existingExpenseRaw2) {
     throw AppError.notFound('El gasto ya no existe.');
   }
+
+  const existingExpenseForDelete = existingExpenseRaw2 as { id: string; amount_minor: number; currency: string | null; note: string | null };
 
   const { error: deleteParticipantsError } = await supabase
     .from('expense_participants')
@@ -288,9 +291,9 @@ export async function deleteExpense({ expenseId, groupId, deletedBy }: DeleteExp
     action: 'expense_deleted',
     payload: {
       expenseId: parsed.expenseId,
-      amountMinor: existingExpense.amount_minor,
-      currency: existingExpense.currency ?? 'EUR',
-      note: existingExpense.note ?? null,
+      amountMinor: existingExpenseForDelete.amount_minor,
+      currency: existingExpenseForDelete.currency ?? 'EUR',
+      note: existingExpenseForDelete.note ?? null,
       groupId: parsed.groupId,
     },
   });
