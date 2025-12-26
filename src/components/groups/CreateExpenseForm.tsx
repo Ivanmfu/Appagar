@@ -1,11 +1,98 @@
 'use client';
 
 import { useAuth } from '@/components/AuthGate';
-import type { GroupExpense, GroupMember } from '@/lib/groups';
-import { createExpense, updateExpense, deleteExpense } from '@/lib/expenses';
 import { splitEvenlyInCents } from '@/lib/money';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+
+// Tipos locales
+type GroupMember = {
+  userId: string;
+  displayName: string | null;
+  email: string | null;
+  joinedAt: string | null;
+  role: string | null;
+  isActive: boolean;
+};
+
+type GroupExpenseParticipant = {
+  userId: string;
+  shareMinor: number;
+  displayName: string | null;
+  email: string | null;
+};
+
+type GroupExpense = {
+  id: string;
+  groupId: string;
+  payerId: string;
+  payerName: string | null;
+  amountMinor: number;
+  amountBaseMinor: number;
+  currency: string;
+  date: string | null;
+  note: string | null;
+  createdAt: string | null;
+  category: string | null;
+  participants: GroupExpenseParticipant[];
+};
+
+// Funciones de API
+async function createExpense(params: {
+  groupId: string;
+  payerId: string;
+  totalCents: number;
+  currency: string;
+  shares: { userId: string; shareCents: number }[];
+  note?: string;
+  date: string;
+}): Promise<{ id: string }> {
+  const res = await fetch('/api/expenses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Error al crear gasto');
+  }
+  return res.json();
+}
+
+async function updateExpense(params: {
+  expenseId: string;
+  groupId: string;
+  payerId: string;
+  totalCents: number;
+  currency: string;
+  shares: { userId: string; shareCents: number }[];
+  note?: string;
+  date: string;
+}): Promise<{ id: string }> {
+  const res = await fetch('/api/expenses', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Error al actualizar gasto');
+  }
+  return res.json();
+}
+
+async function deleteExpense(params: {
+  expenseId: string;
+  groupId: string;
+}): Promise<void> {
+  const res = await fetch(`/api/expenses?expenseId=${params.expenseId}&groupId=${params.groupId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Error al eliminar gasto');
+  }
+}
 
 type Props = {
   groupId: string;
@@ -224,14 +311,10 @@ export function CreateExpenseForm({
         return updateExpense({
           ...payload,
           expenseId: expense.id,
-          updatedBy: user.id,
         });
       }
 
-      return createExpense({
-        ...payload,
-        createdBy: user.id,
-      });
+      return createExpense(payload);
     },
     onSuccess: async () => {
       await Promise.all([
@@ -269,7 +352,6 @@ export function CreateExpenseForm({
       await deleteExpense({
         expenseId: expense.id,
         groupId,
-        deletedBy: user.id,
       });
     },
     onSuccess: async () => {
@@ -396,22 +478,20 @@ export function CreateExpenseForm({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className={`${
-              splitMode === 'equal'
-                ? 'btn-primary px-4 py-2 text-xs'
-                : 'btn-secondary px-4 py-2 text-xs'
-            }`}
+            className={`${splitMode === 'equal'
+              ? 'btn-primary px-4 py-2 text-xs'
+              : 'btn-secondary px-4 py-2 text-xs'
+              }`}
             onClick={() => setSplitMode('equal')}
           >
             Reparto igualitario
           </button>
           <button
             type="button"
-            className={`${
-              splitMode === 'custom'
-                ? 'btn-primary px-4 py-2 text-xs'
-                : 'btn-secondary px-4 py-2 text-xs'
-            }`}
+            className={`${splitMode === 'custom'
+              ? 'btn-primary px-4 py-2 text-xs'
+              : 'btn-secondary px-4 py-2 text-xs'
+              }`}
             onClick={() => setSplitMode('custom')}
           >
             Reparto personalizado
@@ -427,22 +507,21 @@ export function CreateExpenseForm({
             return (
               <label
                 key={member.userId}
-                className={`glass-list-item flex flex-col gap-3 border px-4 py-3 transition ${
-                  checked ? 'border-primary/40 bg-primary-soft/60' : 'border-white/40 bg-white/30'
-                }`}
+                className={`glass-list-item flex flex-col gap-3 border px-4 py-3 transition ${checked ? 'border-primary/40 bg-primary-soft/60' : 'border-white/40 bg-white/30'
+                  }`}
               >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-input-border text-primary focus:ring-primary"
-                        checked={checked}
-                        onChange={() => toggleParticipant(member.userId)}
-                      />
-                      <span className="text-sm text-text-primary">
-                        {member.displayName ?? member.email ?? 'Miembro'}
-                      </span>
-                    </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-input-border text-primary focus:ring-primary"
+                      checked={checked}
+                      onChange={() => toggleParticipant(member.userId)}
+                    />
+                    <span className="text-sm text-text-primary">
+                      {member.displayName ?? member.email ?? 'Miembro'}
+                    </span>
+                  </div>
                   {checked && previewShares.length > 0 && (
                     <span className="text-xs text-text-secondary">
                       {formatCurrency(
@@ -495,8 +574,8 @@ export function CreateExpenseForm({
               ? 'Guardando cambios...'
               : 'Guardando...'
             : isEditing
-            ? 'Guardar cambios'
-            : 'Guardar gasto'}
+              ? 'Guardar cambios'
+              : 'Guardar gasto'}
         </button>
         {isEditing && expense && (
           <button

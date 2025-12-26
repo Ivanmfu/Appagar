@@ -2,11 +2,60 @@
 
 import { useAuth } from '@/components/AuthGate';
 import { InviteMemberForm } from '@/components/groups/InviteMemberForm';
-import { deleteGroup, fetchGroupDetail } from '@/lib/groups';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+
+// Tipos locales
+type GroupMember = {
+  userId: string;
+  displayName: string | null;
+  email: string | null;
+  joinedAt: string | null;
+  role: string | null;
+  isActive: boolean;
+};
+
+type GroupInvite = {
+  id: string;
+  receiverEmail: string | null;
+  receiverId: string | null;
+  status: string;
+  expiresAt: string | null;
+};
+
+type GroupDetail = {
+  group: {
+    id: string;
+    name: string;
+    base_currency: string;
+    created_by: string | null;
+    created_at: string;
+  };
+  members: GroupMember[];
+  invites: GroupInvite[];
+};
+
+// Funciones de API
+async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
+  const res = await fetch(`/api/groups/${groupId}`);
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Error al cargar grupo');
+  }
+  return res.json();
+}
+
+async function deleteGroup(params: { groupId: string }): Promise<void> {
+  const res = await fetch(`/api/groups/${params.groupId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Error al eliminar grupo');
+  }
+}
 
 const CARD_CLASS = 'glass-card p-6';
 
@@ -52,7 +101,7 @@ export default function GroupSettingsPageClient() {
       if (!user?.id) {
         throw new Error('Necesitas iniciar sesión para eliminar el grupo');
       }
-      return deleteGroup({ groupId: targetGroupId, actorId: user.id });
+      return deleteGroup({ groupId: targetGroupId });
     },
     onSuccess: async (_data, targetGroupId) => {
       setShowDeleteConfirm(false);

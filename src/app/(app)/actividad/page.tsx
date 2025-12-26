@@ -1,9 +1,32 @@
 'use client';
 
 import { useAuth } from '@/components/AuthGate';
-import { fetchActivityFeed, type ActivityFeedItem } from '@/lib/activity';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+
+// Tipo local para items de actividad
+type ActivityFeedItem = {
+  id: string;
+  groupId: string | null;
+  groupName: string;
+  actorId: string | null;
+  actorName: string;
+  action: 'expense_created' | 'expense_updated' | 'expense_deleted' | 'group_created' | 'group_deleted';
+  payload: {
+    amountMinor?: number;
+    currency?: string;
+    note?: string;
+    groupName?: string;
+  };
+  createdAt: string;
+};
+
+// Función de API
+async function fetchActivityFeed(): Promise<ActivityFeedItem[]> {
+  const res = await fetch('/api/activity');
+  if (!res.ok) throw new Error('Error al cargar actividad');
+  return res.json();
+}
 
 const CARD_CLASS = 'glass-card p-6';
 
@@ -71,7 +94,7 @@ export default function ActivityPage() {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as ActivityFeedItem[];
-      return fetchActivityFeed(user.id);
+      return fetchActivityFeed();
     },
     staleTime: 10_000,
   });

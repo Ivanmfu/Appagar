@@ -1,10 +1,24 @@
 'use client';
 
 import { useAuth } from '@/components/AuthGate';
-import { getSupabaseClient } from '@/lib/supabase';
 import { useMutation } from '@tanstack/react-query';
+import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
+
+// Función para actualizar perfil via API
+async function updateProfile(data: { displayName?: string; email?: string; password?: string }) {
+  const res = await fetch('/api/profile', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Error al actualizar perfil');
+  }
+  return res.json();
+}
 
 const CARD_CLASS = 'glass-card p-6';
 
@@ -68,22 +82,8 @@ export default function AccountPage() {
       if (!user?.id) {
         throw new Error('Necesitas iniciar sesión para actualizar tu nombre.');
       }
-
-      const supabase = getSupabaseClient();
       const value = nextDisplayName.trim();
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ display_name: value || null })
-        .eq('id', user.id);
-
-      if (profileError) throw profileError;
-
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { display_name: value || null, full_name: value || null },
-      });
-
-      if (authError) throw authError;
+      return updateProfile({ displayName: value || undefined });
     },
     onSuccess: async (_, variables) => {
       setDisplayName(variables);
@@ -103,23 +103,8 @@ export default function AccountPage() {
       if (!user?.id) {
         throw new Error('Necesitas iniciar sesión para actualizar tu correo.');
       }
-
-      const supabase = getSupabaseClient();
       const value = nextEmail.trim().toLowerCase();
-
-      const { error: authError } = await supabase.auth.updateUser({
-        email: value,
-      });
-
-      if (authError) throw authError;
-
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ email: value })
-        .eq('id', user.id);
-
-      if (profileError) throw profileError;
-
+      await updateProfile({ email: value });
       return { requiresConfirmation: value !== normalizedCurrentEmail } as const;
     },
     onSuccess: async ({ requiresConfirmation }, variables) => {
@@ -128,7 +113,7 @@ export default function AccountPage() {
       setEmailFeedback({
         status: 'success',
         message: requiresConfirmation
-          ? 'Hemos enviado un correo para confirmar la dirección nueva. Revísalo para completar el cambio.'
+          ? 'Tu correo se ha actualizado correctamente.'
           : 'Tu correo se ha actualizado correctamente.',
       });
     },
@@ -145,13 +130,7 @@ export default function AccountPage() {
       if (!user?.id) {
         throw new Error('Necesitas iniciar sesión para actualizar tu contraseña.');
       }
-
-      const supabase = getSupabaseClient();
-      const { error } = await supabase.auth.updateUser({
-        password: nextPassword,
-      });
-
-      if (error) throw error;
+      return updateProfile({ password: nextPassword });
     },
     onSuccess: async () => {
       setPassword('');
@@ -172,8 +151,7 @@ export default function AccountPage() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const supabase = getSupabaseClient();
-      await supabase.auth.signOut();
+      await signOut({ redirect: false });
     },
     onSuccess: () => {
       refresh();

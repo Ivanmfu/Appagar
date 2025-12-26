@@ -1,12 +1,51 @@
 'use client';
 
 import { useAuth } from '@/components/AuthGate';
-import { createGroup, fetchUserGroups, GroupSummary } from '@/lib/groups';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Logger, withTiming } from '@/lib/logger';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+
+// Tipos locales (evitamos importar de @/lib/groups que accede a la BD)
+type GroupSummary = {
+  id: string;
+  name: string;
+  baseCurrency: string;
+  createdAt: string | null;
+  memberCount: number;
+  lastExpenseAt: string | null;
+  totalSpendMinor: number;
+  userNetBalanceMinor: number;
+};
+
+type GroupRow = {
+  id: string;
+  name: string;
+  baseCurrency: string;
+  createdAt: string;
+  createdBy: string;
+};
+
+// Funciones de API
+async function fetchUserGroups(): Promise<GroupSummary[]> {
+  const res = await fetch('/api/groups');
+  if (!res.ok) throw new Error('Error al cargar grupos');
+  return res.json();
+}
+
+async function createGroup(params: { name: string; baseCurrency?: string }): Promise<GroupRow> {
+  const res = await fetch('/api/groups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Error al crear grupo');
+  }
+  return res.json();
+}
 
 const CARD_CLASS = 'glass-card p-6';
 
@@ -51,7 +90,7 @@ export default function GroupsPageClient() {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as GroupSummary[];
-      return withTiming('GroupsPage', 'fetchUserGroups', () => fetchUserGroups(user.id));
+      return withTiming('GroupsPage', 'fetchUserGroups', fetchUserGroups);
     },
   });
 
@@ -88,16 +127,7 @@ export default function GroupsPageClient() {
       if (!user?.id) {
         throw new Error('Necesitas iniciar sesión para crear un grupo');
       }
-      return withTiming('GroupsPage', 'createGroup', () => createGroup({
-        name,
-        userId: user.id,
-        email: profile?.email ?? user.email ?? null,
-        displayName:
-          profile?.display_name ??
-          (user.user_metadata as Record<string, unknown>)?.['display_name']?.toString() ??
-          (user.user_metadata as Record<string, unknown>)?.['full_name']?.toString() ??
-          null,
-      }));
+      return withTiming('GroupsPage', 'createGroup', () => createGroup({ name }));
     },
     onSuccess: async (group) => {
       Logger.info('GroupsPage', 'Group created', { groupId: group.id });

@@ -4,14 +4,99 @@ import { useAuth } from '@/components/AuthGate';
 import { GroupBalanceCard } from '@/components/groups/GroupBalanceCard';
 import { ExpenseList } from '@/components/groups/ExpenseList';
 import { EditExpenseModal } from '@/components/groups/EditExpenseModal';
-import { fetchGroupDetail } from '@/lib/groups';
-import { simplifyGroupDebts } from '@/lib/balance';
-import { settleGroupDebt } from '@/lib/settlements';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import type { GroupExpense } from '@/lib/groups';
+
+// Tipos locales
+type GroupExpenseParticipant = {
+  userId: string;
+  shareMinor: number;
+  displayName: string | null;
+  email: string | null;
+};
+
+type GroupExpense = {
+  id: string;
+  groupId: string;
+  payerId: string;
+  payerName: string | null;
+  amountMinor: number;
+  amountBaseMinor: number;
+  currency: string;
+  date: string | null;
+  note: string | null;
+  createdAt: string | null;
+  category: string | null;
+  participants: GroupExpenseParticipant[];
+};
+
+type GroupMember = {
+  userId: string;
+  displayName: string | null;
+  email: string | null;
+  joinedAt: string | null;
+  role: string | null;
+  isActive: boolean;
+};
+
+type GroupDetail = {
+  group: {
+    id: string;
+    name: string;
+    base_currency: string;
+    created_by: string | null;
+    created_at: string;
+    group_type: string | null;
+    start_date: string | null;
+    end_date: string | null;
+    description: string | null;
+  };
+  members: GroupMember[];
+  expenses: GroupExpense[];
+  invites: unknown[];
+  balances: {
+    balances: {
+      userId: string;
+      netBalanceCents: number;
+      totalPaidCents: number;
+      totalOwedCents: number;
+      settlementsPaidCents: number;
+      settlementsReceivedCents: number;
+    }[];
+    transfers: { fromUserId: string; toUserId: string; amountCents: number }[];
+  };
+};
+
+// Funciones de API
+async function fetchGroupDetail(groupId: string): Promise<GroupDetail> {
+  const res = await fetch(`/api/groups/${groupId}`);
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Error al cargar grupo');
+  }
+  return res.json();
+}
+
+async function settleGroupDebt(params: {
+  groupId: string;
+  fromUserId: string;
+  toUserId: string;
+  amountMinor: number;
+}): Promise<void> {
+  const res = await fetch('/api/settlements', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error('Error al registrar liquidación');
+}
+
+async function simplifyGroupDebts(groupId: string): Promise<void> {
+  // TODO: Implementar API para simplificar deudas
+  console.log('Simplificar deudas para grupo:', groupId);
+}
 
 const CARD_CLASS = 'glass-card p-6';
 

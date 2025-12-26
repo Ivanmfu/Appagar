@@ -1,206 +1,91 @@
 'use client';
 
-import { useAuth } from '@/components/AuthGate';
-import { getSupabaseClient } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
-import { ChangeEvent, useEffect, useState } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ChangeEvent, Suspense, useState } from 'react';
 
-type AuthMode = 'login' | 'signup' | 'magic-link';
+type AuthMode = 'login' | 'signup';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams?.get('callbackUrl') ?? '/';
+  const error = searchParams?.get('error');
+
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
+  const [errorMsg, setErrorMsg] = useState(error ? 'Error de autenticación' : '');
   const [loading, setLoading] = useState(false);
-  const [processingOAuth, setProcessingOAuth] = useState(false);
-  const { refresh, session, loading: authLoading } = useAuth();
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.slice(1));
-
-    if (params.has('code') || hashParams.has('access_token')) {
-      console.log('[Login] OAuth callback detectado, procesando...');
-      setProcessingOAuth(true);
-      setLoading(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!processingOAuth) return;
-    if (authLoading) return;
-
-    if (session) {
-      router.replace('/');
-      return;
-    }
-
-    setProcessingOAuth(false);
-    setLoading(false);
-    setError('No se pudo completar la autenticación con Google. Intenta nuevamente.');
-  }, [processingOAuth, authLoading, session, router]);
 
   async function handleEmailPassword() {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-    const loginRedirect = `${window.location.origin}${basePath}/login`;
-
     if (!email || !password) {
-      setError('Por favor ingresa tu email y contraseña');
+      setErrorMsg('Por favor ingresa tu email y contraseña');
       return;
     }
 
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      setErrorMsg('La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
     try {
-      setError('');
+      setErrorMsg('');
       setLoading(true);
-      const supabase = getSupabaseClient();
 
       if (mode === 'signup') {
-        const { error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: loginRedirect,
-          },
+        // Para signup, primero registramos y luego hacemos login
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
         });
-        if (authError) throw authError;
-        setSent(true);
-      } else {
-        const { data, error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (authError) throw authError;
-        if (!data.session) {
-          throw new Error('No se pudo establecer la sesión. Intenta de nuevo.');
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.error || 'Error al registrar');
         }
-        await refresh();
-        router.replace('/');
       }
-    } catch (unknownError) {
-      console.error(unknownError);
-      setError(
-        unknownError instanceof Error ? unknownError.message : 'Error al procesar la solicitud',
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  async function handleMagicLink() {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-    const loginRedirect = `${window.location.origin}${basePath}/login`;
-
-    if (!email) {
-      setError('Por favor ingresa tu email');
-      return;
-    }
-
-    try {
-      setError('');
-      setLoading(true);
-      const supabase = getSupabaseClient();
-      const { error: authError } = await supabase.auth.signInWithOtp({
+      const result = await signIn('credentials', {
         email,
-        options: {
-          emailRedirectTo: loginRedirect,
-        },
+        password,
+        redirect: false,
       });
 
-      if (authError) throw authError;
-      setSent(true);
-    } catch (unknownError) {
-      console.error(unknownError);
-      setError(unknownError instanceof Error ? unknownError.message : 'Error al enviar enlace');
+      if (result?.error) {
+        setErrorMsg('Email o contraseña incorrectos');
+      } else {
+        router.replace(callbackUrl);
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err instanceof Error ? err.message : 'Error al procesar la solicitud');
     } finally {
       setLoading(false);
     }
   }
 
   async function handleGoogleLogin() {
-    const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
-    const loginRedirect = `${window.location.origin}${basePath}/login`;
-
     try {
-      setError('');
+      setErrorMsg('');
       setLoading(true);
-      const supabase = getSupabaseClient();
-      const { error: authError } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: loginRedirect,
-        },
-      });
-
-      if (authError) throw authError;
-    } catch (unknownError) {
-      console.error(unknownError);
-      setError(unknownError instanceof Error ? unknownError.message : 'Error al iniciar sesión con Google');
+      await signIn('google', { callbackUrl });
+    } catch (err) {
+      console.error(err);
+      setErrorMsg('Error al iniciar sesión con Google');
       setLoading(false);
     }
-  }
-
-  if (processingOAuth) {
-    return (
-      <main className="relative flex min-h-screen items-center justify-center px-4 py-16 text-text-primary">
-        <div className="glass-card w-full max-w-md space-y-4 p-6 text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
-          <h1 className="text-2xl font-semibold">Completando inicio de sesión...</h1>
-          <p className="text-sm text-text-secondary">Estamos procesando tu autenticación con Google.</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (sent) {
-    return (
-      <main className="relative flex min-h-screen items-center justify-center px-4 py-16 text-text-primary">
-        <div className="glass-card w-full max-w-md space-y-4 p-6 text-center">
-          <div className="text-5xl">📧</div>
-          <h1 className="text-2xl font-semibold text-text-primary">¡Revisa tu correo!</h1>
-          <p className="text-sm text-text-secondary">
-            Hemos enviado {mode === 'signup' ? 'un enlace de confirmación' : 'un enlace mágico'} a{' '}
-            <strong>{email}</strong>
-          </p>
-          <p className="text-sm text-text-secondary">
-            {mode === 'signup'
-              ? 'Haz clic en el enlace del email para confirmar tu cuenta.'
-              : 'Haz clic en el enlace del email para acceder a tu cuenta.'}
-            <br />El enlace es válido por 1 hora.
-          </p>
-          <button
-            className="btn-secondary justify-center"
-            onClick={() => {
-              setSent(false);
-              setEmail('');
-              setPassword('');
-            }}
-            type="button"
-          >
-            Volver
-          </button>
-        </div>
-      </main>
-    );
   }
 
   const modeDescriptions: Record<AuthMode, string> = {
     login: 'Inicia sesión en tu cuenta para continuar con tus grupos y gastos.',
     signup: 'Crea tu cuenta y empieza a compartir gastos con tu equipo.',
-    'magic-link': 'Te enviaremos un enlace mágico para que accedas sin contraseña.',
   };
 
   const tabOptions: { value: AuthMode; label: string }[] = [
     { value: 'login', label: 'Iniciar sesión' },
     { value: 'signup', label: 'Registrarse' },
-    { value: 'magic-link', label: 'Enlace mágico' },
   ];
 
   return (
@@ -220,14 +105,13 @@ export default function LoginPage() {
           {tabOptions.map((option) => (
             <button
               key={option.value}
-              className={`flex-1 rounded-full px-4 py-2 transition ${
-                mode === option.value
+              className={`flex-1 rounded-full px-4 py-2 transition ${mode === option.value
                   ? 'bg-white/80 text-text-primary shadow-sm'
                   : 'text-text-secondary hover:text-text-primary'
-              }`}
+                }`}
               onClick={() => {
                 setMode(option.value);
-                setError('');
+                setErrorMsg('');
               }}
               disabled={loading}
               type="button"
@@ -274,109 +158,78 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {mode !== 'magic-link' ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-text-primary">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  className="input-field disabled:cursor-not-allowed disabled:opacity-60"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                    setEmail(event.target.value);
-                    setError('');
-                  }}
-                  type="email"
-                  required
-                  disabled={loading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-text-primary">
-                  Contraseña
-                </label>
-                <input
-                  id="password"
-                  className="input-field disabled:cursor-not-allowed disabled:opacity-60"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                    setPassword(event.target.value);
-                    setError('');
-                  }}
-                  onKeyDown={(event) => event.key === 'Enter' && handleEmailPassword()}
-                  type="password"
-                  required
-                  disabled={loading}
-                />
-                {mode === 'signup' && (
-                  <p className="text-xs text-text-secondary">Mínimo 6 caracteres</p>
-                )}
-              </div>
-
-              {error && (
-                <div className="glass-danger px-4 py-3 text-sm text-danger">
-                  {error}
-                </div>
-              )}
-
-              <button
-                className="btn-primary w-full disabled:pointer-events-none disabled:opacity-60"
-                onClick={handleEmailPassword}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="email" className="block text-sm font-medium text-text-primary">
+                Email
+              </label>
+              <input
+                id="email"
+                className="input-field disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  setEmail(event.target.value);
+                  setErrorMsg('');
+                }}
+                type="email"
+                required
                 disabled={loading}
-                type="button"
-              >
-                {loading ? 'Procesando...' : mode === 'signup' ? 'Crear cuenta' : 'Iniciar sesión'}
-              </button>
+              />
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-text-primary">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  className="input-field disabled:cursor-not-allowed disabled:opacity-60"
-                  placeholder="tu@email.com"
-                  value={email}
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
-                    setEmail(event.target.value);
-                    setError('');
-                  }}
-                  onKeyDown={(event) => event.key === 'Enter' && handleMagicLink()}
-                  type="email"
-                  required
-                  disabled={loading}
-                />
-              </div>
 
-              {error && (
-                <div className="glass-danger px-4 py-3 text-sm text-danger">
-                  {error}
-                </div>
-              )}
-
-              <button
-                className="btn-primary w-full disabled:pointer-events-none disabled:opacity-60"
-                onClick={handleMagicLink}
+            <div className="space-y-2">
+              <label htmlFor="password" className="block text-sm font-medium text-text-primary">
+                Contraseña
+              </label>
+              <input
+                id="password"
+                className="input-field disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="••••••••"
+                value={password}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                  setPassword(event.target.value);
+                  setErrorMsg('');
+                }}
+                onKeyDown={(event) => event.key === 'Enter' && handleEmailPassword()}
+                type="password"
+                required
                 disabled={loading}
-                type="button"
-              >
-                {loading ? 'Enviando...' : 'Enviar enlace mágico'}
-              </button>
-
-              <div className="text-center text-xs text-text-secondary">
-                Te enviaremos un enlace mágico para acceder sin contraseña.
-              </div>
+              />
+              {mode === 'signup' && (
+                <p className="text-xs text-text-secondary">Mínimo 6 caracteres</p>
+              )}
             </div>
-          )}
+
+            {errorMsg && (
+              <div className="glass-danger px-4 py-3 text-sm text-danger">
+                {errorMsg}
+              </div>
+            )}
+
+            <button
+              className="btn-primary w-full disabled:pointer-events-none disabled:opacity-60"
+              onClick={handleEmailPassword}
+              disabled={loading}
+              type="button"
+            >
+              {loading ? 'Procesando...' : mode === 'signup' ? 'Crear cuenta' : 'Iniciar sesión'}
+            </button>
+          </div>
         </div>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+      </main>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -1,15 +1,60 @@
 'use client';
 
 import { useAuth } from '@/components/AuthGate';
-import {
-  fetchUserDebtRelations,
-  fetchUserGroups,
-  GroupSummary,
-  UserDebtRelation,
-} from '@/lib/groups';
-import { settleGroupDebt } from '@/lib/settlements';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Logger, withTiming } from '@/lib/logger';
+
+// Tipos para los datos del dashboard
+interface GroupSummary {
+  id: string;
+  name: string;
+  baseCurrency: string;
+  memberCount: number;
+  createdAt: string;
+  lastExpenseAt: string | null;
+  totalSpendMinor: number;
+  userNetBalanceMinor: number;
+}
+
+interface UserDebtRelation {
+  groupId: string;
+  groupName: string;
+  baseCurrency: string;
+  fromUserId: string;
+  fromName: string;
+  toUserId: string;
+  toName: string;
+  amountCents: number;
+  counterpartyName: string;
+  direction: 'incoming' | 'outgoing';
+}
+
+// Funciones para fetch desde API routes
+async function fetchUserGroups(): Promise<GroupSummary[]> {
+  const res = await fetch('/api/groups');
+  if (!res.ok) throw new Error('Error al cargar grupos');
+  return res.json();
+}
+
+async function fetchUserDebtRelations(): Promise<UserDebtRelation[]> {
+  const res = await fetch('/api/debt-relations');
+  if (!res.ok) throw new Error('Error al cargar relaciones de deuda');
+  return res.json();
+}
+
+async function settleGroupDebt(params: {
+  groupId: string;
+  fromUserId: string;
+  toUserId: string;
+  amountMinor: number;
+}): Promise<void> {
+  const res = await fetch('/api/settlements', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error('Error al registrar liquidación');
+}
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 
@@ -53,7 +98,7 @@ export default function DashboardPageClient() {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as GroupSummary[];
-      return withTiming('Dashboard', 'fetchUserGroups', () => fetchUserGroups(user.id));
+      return withTiming('Dashboard', 'fetchUserGroups', fetchUserGroups);
     },
   });
 
@@ -62,7 +107,7 @@ export default function DashboardPageClient() {
     enabled: Boolean(user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as UserDebtRelation[];
-      return withTiming('Dashboard', 'fetchUserDebtRelations', () => fetchUserDebtRelations(user.id));
+      return withTiming('Dashboard', 'fetchUserDebtRelations', fetchUserDebtRelations);
     },
     staleTime: 15_000,
   });
