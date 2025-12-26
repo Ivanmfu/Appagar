@@ -73,7 +73,7 @@ function InviteContent() {
     queryFn: () => fetchInviteByToken(token),
   });
 
-  const groupQuery = useQuery({
+  const groupQuery = useQuery<{ id: string; name: string; base_currency: string } | null>({
     queryKey: ['invite-group', inviteQuery.data?.group_id],
     enabled: Boolean(inviteQuery.data?.group_id),
     queryFn: async () => {
@@ -84,7 +84,7 @@ function InviteContent() {
         .eq('id', inviteQuery.data?.group_id ?? '')
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data as { id: string; name: string; base_currency: string } | null;
     },
   });
 
