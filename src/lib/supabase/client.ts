@@ -3,7 +3,7 @@
  * This maintains API compatibility with existing code while using Neon
  */
 
-import { query, queryOne } from '@/lib/db';
+import { query } from '@/lib/db';
 import { Logger } from '@/lib/logger';
 
 // Types to maintain compatibility
@@ -56,7 +56,7 @@ function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
-function transformKeys<T>(obj: Record<string, unknown>): T {
+function _transformKeys<T>(obj: Record<string, unknown>): T {
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(obj)) {
     result[snakeToCamel(key)] = obj[key];
@@ -123,7 +123,7 @@ function createTableBuilder<T>(tableName: string) {
           const params: unknown[] = [];
           
           if (conditions.length > 0) {
-            const whereClauses = conditions.map((c, i) => {
+            const whereClauses = conditions.map((c, _i) => {
               if (c.op === 'IN') {
                 const inPlaceholders = (c.value as unknown[]).map((_, j) => `$${params.length + j + 1}`).join(', ');
                 params.push(...(c.value as unknown[]));
@@ -288,12 +288,12 @@ function createTableBuilder<T>(tableName: string) {
         try {
           const updates = Object.entries(data as object);
           const setClause = updates.map(([key], i) => `${key} = $${i + 1}`).join(', ');
-          const params = updates.map(([_, value]) => value);
+          const params = updates.map(([_key, value]) => value);
           
           let sql = `UPDATE ${tableName} SET ${setClause}`;
           
           if (conditions.length > 0) {
-            const whereClause = conditions.map((c, i) => {
+            const whereClause = conditions.map((c, _i) => {
               params.push(c.value);
               return `${c.column} = $${params.length}`;
             }).join(' AND ');

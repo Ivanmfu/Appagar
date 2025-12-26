@@ -72,7 +72,7 @@ function describeBalance(minor: number, currency: string) {
 }
 
 export default function GroupsPageClient() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();

@@ -220,7 +220,7 @@ export default function GroupSettingsPageClient() {
 
         {showInviteForm && user?.id && (
           <div className="rounded-2xl border border-white/30 bg-white/70 p-5 shadow-[0_6px_18px_rgba(0,0,0,0.06)] backdrop-blur-xl">
-            <InviteMemberForm createdBy={user.id} groupId={detail.group.id} />
+            <InviteMemberForm groupId={detail.group.id} />
           </div>
         )}
 

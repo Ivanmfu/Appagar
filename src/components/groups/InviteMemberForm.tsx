@@ -3,11 +3,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FormEvent, useState } from 'react';
 
-type Props = {
-  groupId: string;
-  createdBy: string;
-};
-
 type InviteResult = {
   invite: {
     id: string;
@@ -37,7 +32,7 @@ async function createGroupInvite(params: {
   return res.json();
 }
 
-export function InviteMemberForm({ groupId, createdBy }: Props) {
+export function InviteMemberForm({ groupId }: { groupId: string }) {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState('');
   const [inviteLink, setInviteLink] = useState<string | null>(null);
