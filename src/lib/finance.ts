@@ -74,6 +74,8 @@ export type UserTotals = {
   netBalanceCents: number;
 };
 
+type GroupBalanceViewRow = Database['public']['Views']['group_balance']['Row'];
+
 type ExpenseRowLite = Pick<
   Database['public']['Tables']['expenses']['Row'],
   'id' | 'group_id' | 'payer_id' | 'amount_minor' | 'amount_base_minor'
@@ -181,13 +183,57 @@ export function summarizeUserTotalsFromData(
     .sort((a, b) => a.userId.localeCompare(b.userId));
 }
 
+async function computeUserTotalsFromView(groupId: string): Promise<UserTotals[] | null> {
+  const supabase = getSupabaseClient();
+
+  try {
+    const { data, error } = await supabase
+      .from('group_balance')
+      .select(
+        'user_id, total_paid_minor, total_owed_minor, settlements_paid_minor, settlements_received_minor, net_minor',
+      )
+      .eq('group_id', groupId);
+
+    if (error) {
+      console.warn('[Finance] group_balance view error, fallback to manual aggregation', error);
+      return null;
+    }
+
+    if (!data) return [];
+
+    const rows = data as GroupBalanceViewRow[];
+
+    return rows
+      .map((row) => ({
+        userId: row.user_id,
+        totalPaidCents: row.total_paid_minor ?? 0,
+        totalOwedCents: row.total_owed_minor ?? 0,
+        settlementsPaidCents: row.settlements_paid_minor ?? 0,
+        settlementsReceivedCents: row.settlements_received_minor ?? 0,
+        netBalanceCents: row.net_minor ?? 0,
+      }))
+      .sort((a, b) => a.userId.localeCompare(b.userId));
+  } catch (viewError) {
+    console.warn('[Finance] group_balance view unavailable, fallback to manual aggregation', viewError);
+    return null;
+  }
+}
+
 export async function computeUserTotals(groupId: string, seed?: SeedData): Promise<UserTotals[]> {
   if (!groupId) throw new Error('groupId es obligatorio');
 
-  const supabase = getSupabaseClient();
+  if (!seed) {
+    const viewTotals = await computeUserTotalsFromView(groupId);
+    if (viewTotals !== null) {
+      return viewTotals;
+    }
+  }
+
+  let supabase = seed ? null : getSupabaseClient();
 
   let expenseRows = seed?.expenses;
   if (!expenseRows) {
+    supabase ??= getSupabaseClient();
     const { data, error } = await supabase
       .from('expenses')
       .select('id, group_id, amount_minor, amount_base_minor, payer_id')
@@ -196,39 +242,9 @@ export async function computeUserTotals(groupId: string, seed?: SeedData): Promi
     expenseRows = (data ?? []) as ExpenseRowLite[];
   }
 
-  const expenseRecords: ExpenseRecord[] = (expenseRows ?? []).map((row) => ({
-    id: row.id,
-    groupId: row.group_id,
-    amountCents: typeof row.amount_base_minor === 'number' ? row.amount_base_minor : row.amount_minor ?? 0,
-    paidByUserId: row.payer_id,
-  }));
-
-  const expenseIds = expenseRecords.map((expense) => expense.id);
-
-  let shareRows = seed?.shares;
-  if (!shareRows) {
-    if (expenseIds.length > 0) {
-      const { data, error } = await supabase
-        .from('expense_participants')
-        .select('expense_id, user_id, share_minor, is_included')
-        .in('expense_id', expenseIds);
-      if (error) throw error;
-      shareRows = (data ?? []) as ExpenseParticipantRowLite[];
-    } else {
-      shareRows = [];
-    }
-  }
-
-  const shareRecords: ExpenseShareRecord[] = (shareRows ?? [])
-    .filter((row) => row.is_included !== false)
-    .map((row) => ({
-      expenseId: row.expense_id,
-      userId: row.user_id,
-      shareCents: row.share_minor ?? 0,
-    }));
-
   let memberRows = seed?.members;
   if (!memberRows) {
+    supabase ??= getSupabaseClient();
     const { data, error } = await supabase
       .from('group_members')
       .select('user_id, is_active')
@@ -242,8 +258,46 @@ export async function computeUserTotals(groupId: string, seed?: SeedData): Promi
     .map((row) => row.user_id)
     .filter((id): id is string => Boolean(id));
 
+  const activeMemberIds = new Set(memberIds);
+
+  const expenseRecords: ExpenseRecord[] = (expenseRows ?? [])
+    .filter((row) => activeMemberIds.has(row.payer_id))
+    .map((row) => ({
+      id: row.id,
+      groupId: row.group_id,
+      amountCents: typeof row.amount_base_minor === 'number' ? row.amount_base_minor : row.amount_minor ?? 0,
+      paidByUserId: row.payer_id,
+    }));
+
+  const expenseIds = expenseRecords.map((expense) => expense.id);
+
+  let shareRows = seed?.shares;
+  if (!shareRows) {
+    if (expenseIds.length > 0) {
+      supabase ??= getSupabaseClient();
+      const { data, error } = await supabase
+        .from('expense_participants')
+        .select('expense_id, user_id, share_minor, is_included')
+        .in('expense_id', expenseIds);
+      if (error) throw error;
+      shareRows = (data ?? []) as ExpenseParticipantRowLite[];
+    } else {
+      shareRows = [];
+    }
+  }
+
+  const shareRecords: ExpenseShareRecord[] = (shareRows ?? [])
+    .filter((row) => row.is_included !== false)
+    .filter((row) => activeMemberIds.has(row.user_id))
+    .map((row) => ({
+      expenseId: row.expense_id,
+      userId: row.user_id,
+      shareCents: row.share_minor ?? 0,
+    }));
+
   let settlementRows = seed?.settlements;
   if (!settlementRows) {
+    supabase ??= getSupabaseClient();
     const { data, error } = await supabase
       .from('settlements')
       .select('group_id, from_user_id, to_user_id, amount_minor')
@@ -252,7 +306,18 @@ export async function computeUserTotals(groupId: string, seed?: SeedData): Promi
     settlementRows = (data ?? []) as SettlementRowLite[];
   }
 
-  return summarizeUserTotalsFromData(expenseRecords, shareRecords, memberIds, settlementRows);
+  const filteredSettlements = (settlementRows ?? [])
+    .filter(
+      (settlement) =>
+        activeMemberIds.has(settlement.from_user_id ?? '') && activeMemberIds.has(settlement.to_user_id ?? ''),
+    )
+    .map((settlement) => ({
+      ...settlement,
+      from_user_id: settlement.from_user_id ?? '',
+      to_user_id: settlement.to_user_id ?? '',
+    }));
+
+  return summarizeUserTotalsFromData(expenseRecords, shareRecords, memberIds, filteredSettlements);
 }
 
 export async function computeNetBalances(groupId: string, seed?: SeedData): Promise<UserBalance[]> {

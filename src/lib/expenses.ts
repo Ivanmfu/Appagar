@@ -1,7 +1,13 @@
+import { logActivity } from '@/lib/activity';
+import { Database } from '@/lib/database.types';
+import { AppError } from '@/lib/errors';
 import { computeShares } from '@/lib/finance';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Database } from '@/lib/database.types';
-import { logActivity } from '@/lib/activity';
+import {
+  validateCreateExpenseInput,
+  validateDeleteExpenseInput,
+  validateUpdateExpenseInput,
+} from '@/lib/validation';
 
 type Expense = Database['public']['Tables']['expenses']['Row'];
 
@@ -50,38 +56,51 @@ export async function createExpense({
   date,
   createdBy,
 }: CreateExpenseInput) {
+  const parsed = validateCreateExpenseInput({
+    groupId,
+    payerId,
+    totalCents,
+    currency,
+    fxRate,
+    shares,
+    note,
+    category,
+    date,
+    createdBy,
+  });
+
   const supabase = getSupabaseClient();
-  const amountBaseMinor = Math.round(totalCents * fxRate);
+  const amountBaseMinor = Math.round(parsed.totalCents * parsed.fxRate);
 
   const normalizedShares = computeShares({
-    amountCents: totalCents,
-    paidByUserId: payerId,
-    shares,
+    amountCents: parsed.totalCents,
+    paidByUserId: parsed.payerId,
+    shares: parsed.shares,
   });
 
   const { data: expense, error: createExpenseError } = await supabase
     .from('expenses')
     .insert([
       {
-        group_id: groupId,
-        payer_id: payerId,
-        created_by: createdBy,
-        amount_minor: totalCents,
-        currency,
-        fx_rate: fxRate,
+        group_id: parsed.groupId,
+        payer_id: parsed.payerId,
+        created_by: parsed.createdBy,
+        amount_minor: parsed.totalCents,
+        currency: parsed.currency,
+        fx_rate: parsed.fxRate,
         amount_base_minor: amountBaseMinor,
-        category,
-        note,
-        date,
+        category: parsed.category,
+        note: parsed.note,
+        date: parsed.date,
       },
     ])
     .select()
     .single();
 
-  if (createExpenseError) throw createExpenseError;
+  if (createExpenseError) throw AppError.fromSupabase(createExpenseError, 'No se pudo crear el gasto');
 
   if (!expense) {
-    throw new Error('No se pudo crear el gasto');
+    throw new AppError('unknown', 'No se pudo crear el gasto');
   }
 
   const expenseData = expense as Expense;
@@ -100,18 +119,18 @@ export async function createExpense({
     })
     .select('expense_id,user_id,share_minor,is_included');
 
-  if (participantsError) throw participantsError;
+  if (participantsError) throw AppError.fromSupabase(participantsError, 'No se pudo registrar los participantes');
 
   await logActivity({
-    groupId,
-    actorId: createdBy,
+    groupId: parsed.groupId,
+    actorId: parsed.createdBy,
     action: 'expense_created',
     payload: {
       expenseId: expenseData.id,
-      amountMinor: totalCents,
-      currency,
-      note: note ?? null,
-      groupId,
+      amountMinor: parsed.totalCents,
+      currency: parsed.currency,
+      note: parsed.note ?? null,
+      groupId: parsed.groupId,
     },
   });
 
@@ -131,62 +150,76 @@ export async function updateExpense({
   date,
   updatedBy,
 }: UpdateExpenseInput) {
+  const parsed = validateUpdateExpenseInput({
+    expenseId,
+    groupId,
+    payerId,
+    totalCents,
+    currency,
+    fxRate,
+    shares,
+    note,
+    category,
+    date,
+    updatedBy,
+  });
+
   const supabase = getSupabaseClient();
-  const amountBaseMinor = Math.round(totalCents * fxRate);
+  const amountBaseMinor = Math.round(parsed.totalCents * parsed.fxRate);
 
   const normalizedShares = computeShares({
-    amountCents: totalCents,
-    paidByUserId: payerId,
-    shares,
+    amountCents: parsed.totalCents,
+    paidByUserId: parsed.payerId,
+    shares: parsed.shares,
   });
 
   const { data: existingExpense, error: fetchExistingError } = await supabase
     .from('expenses')
     .select('id, created_by')
-    .eq('id', expenseId)
-    .eq('group_id', groupId)
+    .eq('id', parsed.expenseId)
+    .eq('group_id', parsed.groupId)
     .maybeSingle();
 
-  if (fetchExistingError) throw fetchExistingError;
+  if (fetchExistingError) throw AppError.fromSupabase(fetchExistingError, 'No se pudo cargar el gasto');
   if (!existingExpense) {
-    throw new Error('El gasto no existe o ya fue eliminado.');
+    throw AppError.notFound('El gasto no existe o ya fue eliminado.');
   }
 
-  const createdBy = existingExpense.created_by ?? updatedBy;
+  const createdBy = existingExpense.created_by ?? parsed.updatedBy;
 
   const { data: updatedExpense, error: expenseUpdateError } = await supabase
     .from('expenses')
     .update({
-      payer_id: payerId,
+      payer_id: parsed.payerId,
       created_by: createdBy,
-      amount_minor: totalCents,
-      currency,
-      fx_rate: fxRate,
+      amount_minor: parsed.totalCents,
+      currency: parsed.currency,
+      fx_rate: parsed.fxRate,
       amount_base_minor: amountBaseMinor,
-      category,
-      note,
-      date,
+      category: parsed.category,
+      note: parsed.note,
+      date: parsed.date,
     })
-    .eq('id', expenseId)
-    .eq('group_id', groupId)
+    .eq('id', parsed.expenseId)
+    .eq('group_id', parsed.groupId)
     .select()
     .single();
 
-  if (expenseUpdateError) throw expenseUpdateError;
+  if (expenseUpdateError) throw AppError.fromSupabase(expenseUpdateError, 'No se pudo actualizar el gasto');
   if (!updatedExpense) {
-    throw new Error('No se pudo actualizar el gasto');
+    throw new AppError('unknown', 'No se pudo actualizar el gasto');
   }
 
   const { error: deleteParticipantsError } = await supabase
     .from('expense_participants')
     .delete()
-    .eq('expense_id', expenseId);
+    .eq('expense_id', parsed.expenseId);
 
-  if (deleteParticipantsError) throw deleteParticipantsError;
+  if (deleteParticipantsError) throw AppError.fromSupabase(deleteParticipantsError, 'No se pudo actualizar el reparto');
 
   if (normalizedShares.length > 0) {
     const rows = normalizedShares.map((share) => ({
-      expense_id: expenseId,
+      expense_id: parsed.expenseId,
       user_id: share.userId,
       share_minor: share.shareCents,
       is_included: true,
@@ -199,19 +232,19 @@ export async function updateExpense({
       })
       .select('expense_id,user_id,share_minor,is_included');
 
-    if (insertParticipantsError) throw insertParticipantsError;
+    if (insertParticipantsError) throw AppError.fromSupabase(insertParticipantsError, 'No se pudo actualizar el reparto');
   }
 
   await logActivity({
-    groupId,
-    actorId: updatedBy,
+    groupId: parsed.groupId,
+    actorId: parsed.updatedBy,
     action: 'expense_updated',
     payload: {
-      expenseId,
-      amountMinor: totalCents,
-      currency,
-      note: note ?? null,
-      groupId,
+      expenseId: parsed.expenseId,
+      amountMinor: parsed.totalCents,
+      currency: parsed.currency,
+      note: parsed.note ?? null,
+      groupId: parsed.groupId,
     },
   });
 
@@ -219,45 +252,46 @@ export async function updateExpense({
 }
 
 export async function deleteExpense({ expenseId, groupId, deletedBy }: DeleteExpenseInput) {
+  const parsed = validateDeleteExpenseInput({ expenseId, groupId, deletedBy });
   const supabase = getSupabaseClient();
 
   const { data: existingExpense, error: fetchError } = await supabase
     .from('expenses')
     .select('id, amount_minor, currency, note')
-    .eq('id', expenseId)
-    .eq('group_id', groupId)
+    .eq('id', parsed.expenseId)
+    .eq('group_id', parsed.groupId)
     .maybeSingle();
 
-  if (fetchError) throw fetchError;
+  if (fetchError) throw AppError.fromSupabase(fetchError, 'No se pudo cargar el gasto');
   if (!existingExpense) {
-    throw new Error('El gasto ya no existe.');
+    throw AppError.notFound('El gasto ya no existe.');
   }
 
   const { error: deleteParticipantsError } = await supabase
     .from('expense_participants')
     .delete()
-    .eq('expense_id', expenseId);
+    .eq('expense_id', parsed.expenseId);
 
-  if (deleteParticipantsError) throw deleteParticipantsError;
+  if (deleteParticipantsError) throw AppError.fromSupabase(deleteParticipantsError, 'No se pudo borrar el reparto');
 
   const { error: deleteExpenseError } = await supabase
     .from('expenses')
     .delete()
-    .eq('id', expenseId)
-    .eq('group_id', groupId);
+    .eq('id', parsed.expenseId)
+    .eq('group_id', parsed.groupId);
 
-  if (deleteExpenseError) throw deleteExpenseError;
+  if (deleteExpenseError) throw AppError.fromSupabase(deleteExpenseError, 'No se pudo eliminar el gasto');
 
   await logActivity({
-    groupId,
-    actorId: deletedBy,
+    groupId: parsed.groupId,
+    actorId: parsed.deletedBy,
     action: 'expense_deleted',
     payload: {
-      expenseId,
+      expenseId: parsed.expenseId,
       amountMinor: existingExpense.amount_minor,
       currency: existingExpense.currency ?? 'EUR',
       note: existingExpense.note ?? null,
-      groupId,
+      groupId: parsed.groupId,
     },
   });
 }

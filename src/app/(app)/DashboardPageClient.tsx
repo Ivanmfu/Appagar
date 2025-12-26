@@ -174,6 +174,7 @@ export default function DashboardPageClient() {
         queryClient.invalidateQueries({ queryKey: ['debt-relations', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['groups', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['group-detail', variables.groupId] }),
+        queryClient.invalidateQueries({ queryKey: ['group-balance', variables.groupId] }),
       ]);
     },
     onError: (err) => Logger.error('Dashboard', 'Settlement error', { err }),

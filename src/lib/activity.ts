@@ -1,8 +1,6 @@
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Database, Json } from '@/lib/database.types';
 
-type ActivityRow = Database['public']['Tables']['activity_events']['Row'];
-
 export type ActivityAction =
 	| 'expense_created'
 	| 'expense_updated'
@@ -78,65 +76,45 @@ export async function logActivity({ groupId = null, actorId, action, payload }: 
 }
 
 export async function fetchActivityFeed(userId: string | null): Promise<ActivityFeedItem[]> {
-	if (!userId) return [];
+        if (!userId) return [];
 
-	const supabase = getSupabaseClient();
+        const supabase = getSupabaseClient();
 
-	const { data: membershipRows, error: membershipError } = await supabase
-		.from('group_members')
-		.select('group_id')
-		.eq('user_id', userId)
-		.eq('is_active', true);
+        const { data: membershipRows, error: membershipError } = await supabase
+                .from('group_members')
+                .select('group_id')
+                .eq('user_id', userId)
+                .eq('is_active', true);
 
 	if (membershipError) {
 		throw membershipError;
 	}
 
-	const groupIds = Array.from(new Set((membershipRows ?? []).map((row) => row.group_id)));
+        const groupIds = Array.from(
+                new Set((membershipRows ?? []).map((row: { group_id: string }) => row.group_id))
+        );
 
-	const eventMap = new Map<string, ActivityRow>();
+        const filters = [`actor_id.eq.${userId}`];
+        if (groupIds.length > 0) {
+                filters.push(`group_id.in.(${groupIds.join(',')})`);
+        }
 
-	if (groupIds.length > 0) {
-		const { data: groupEvents, error: groupEventsError } = await supabase
-			.from('activity_events')
-			.select('id, group_id, actor_id, action, payload, created_at')
-			.in('group_id', groupIds)
-			.order('created_at', { ascending: false })
-			.limit(60);
+        const { data: eventsData, error: eventsError } = await supabase
+                .from('activity_events')
+                .select('id, group_id, actor_id, action, payload, created_at')
+                .or(filters.join(','))
+                .order('created_at', { ascending: false })
+                .limit(80);
 
-		if (groupEventsError) {
-			throw groupEventsError;
-		}
+        if (eventsError) {
+                throw eventsError;
+        }
 
-		(groupEvents ?? []).forEach((event) => {
-			if (!eventMap.has(event.id)) {
-				eventMap.set(event.id, event as ActivityRow);
-			}
-		});
-	}
-
-	const { data: ownEvents, error: ownEventsError } = await supabase
-		.from('activity_events')
-		.select('id, group_id, actor_id, action, payload, created_at')
-		.eq('actor_id', userId)
-		.order('created_at', { ascending: false })
-		.limit(60);
-
-	if (ownEventsError) {
-		throw ownEventsError;
-	}
-
-	(ownEvents ?? []).forEach((event) => {
-		if (!eventMap.has(event.id)) {
-			eventMap.set(event.id, event as ActivityRow);
-		}
-	});
-
-	const events = Array.from(eventMap.values()).sort((a, b) => {
-		const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-		const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-		return bTime - aTime;
-	});
+        const events = (eventsData ?? []).sort((a, b) => {
+                const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+                return bTime - aTime;
+        });
 
 	if (events.length === 0) {
 		return [];
@@ -174,15 +152,15 @@ export async function fetchActivityFeed(userId: string | null): Promise<Activity
 		throw groupsRes.error;
 	}
 
-	const profileMap = new Map<string, ProfileLite>();
-	(profilesRes.data ?? []).forEach((profile) => {
-		profileMap.set(profile.id, profile);
-	});
+        const profileMap = new Map<string, ProfileLite>();
+        (profilesRes.data ?? []).forEach((profile: ProfileLite) => {
+                profileMap.set(profile.id, profile);
+        });
 
-	const groupMap = new Map<string, GroupLite>();
-	(groupsRes.data ?? []).forEach((group) => {
-		groupMap.set(group.id, group);
-	});
+        const groupMap = new Map<string, GroupLite>();
+        (groupsRes.data ?? []).forEach((group: GroupLite) => {
+                groupMap.set(group.id, group);
+        });
 
 	return events.map((event) => {
 		const payload = ensurePayload(event.payload);
