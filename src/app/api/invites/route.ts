@@ -17,9 +17,9 @@ export async function POST(request: NextRequest) {
     
     const { groupId, email } = body;
 
-    if (!groupId || !email?.trim()) {
+    if (!groupId) {
       return NextResponse.json(
-        { error: 'Faltan campos requeridos' },
+        { error: 'Falta el ID del grupo' },
         { status: 400 }
       );
     }
@@ -34,17 +34,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No tienes acceso a este grupo' }, { status: 403 });
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = email?.trim()?.toLowerCase() || 'invite-link@appagar.app';
+    const isLinkOnlyInvite = !email?.trim();
 
-    // Buscar si el email ya tiene cuenta
-    const existingProfile = await queryOne<{
-      id: string;
-      email: string | null;
-      display_name: string | null;
-    }>(
-      `SELECT id, email, display_name FROM users WHERE LOWER(email) = $1`,
-      [normalizedEmail]
-    );
+    // Buscar si el email ya tiene cuenta (solo si hay email real)
+    let existingProfile = null;
+    if (!isLinkOnlyInvite) {
+      existingProfile = await queryOne<{
+        id: string;
+        email: string | null;
+        display_name: string | null;
+      }>(
+        `SELECT id, email, display_name FROM users WHERE LOWER(email) = $1`,
+        [normalizedEmail]
+      );
+    }
 
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + INVITE_EXPIRATION_HOURS * 60 * 60 * 1000).toISOString();
